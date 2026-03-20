@@ -179,7 +179,19 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .conseq-title{font-size:9pt;font-weight:700;color:var(--red);margin-bottom:3px}
 .conseq-desc{font-size:8pt;color:var(--text2);line-height:1.55}
 .footer-note{font-size:7.5pt;color:var(--muted2);text-align:center;padding:16px;border-top:1px solid var(--border);margin-top:8px;font-style:italic}
-@media(max-width:900px){.app{grid-template-columns:1fr}.rpt-grid{grid-template-columns:1fr 1fr}.rules-grid{grid-template-columns:1fr}.conseq-grid{grid-template-columns:1fr}}
+.search-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mode-chip{border:1.5px solid var(--border2);background:var(--white);border-radius:9px;padding:10px 11px;cursor:pointer;transition:all .15s}
+.mode-chip.active{border-color:var(--blue);background:#eff6ff;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.mode-chip-title{font-size:8pt;font-weight:700;color:var(--text);margin-bottom:2px}
+.mode-chip-sub{font-size:7.2pt;color:var(--muted);line-height:1.4}
+.helper-note{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:7.8pt;color:var(--text2);line-height:1.55;margin-top:10px}
+.quick-examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.quick-pill{border:none;background:#e2e8f0;color:#334155;border-radius:999px;padding:6px 9px;font-size:7.4pt;font-weight:700;cursor:pointer;transition:all .15s}
+.quick-pill:hover{background:#dbeafe;color:#1d4ed8}
+.inline-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.btn-soft{width:100%;background:var(--white);color:var(--text2);border:1.5px solid var(--border2);border-radius:9px;padding:10px;font-size:9pt;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-soft:hover{border-color:var(--blue);color:var(--blue);background:#eff6ff}
+@media(max-width:900px){.app{grid-template-columns:1fr}.rpt-grid{grid-template-columns:1fr 1fr}.rules-grid{grid-template-columns:1fr}.conseq-grid{grid-template-columns:1fr}.search-mode{grid-template-columns:1fr}.inline-actions{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -187,7 +199,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="topbar-logo">🏥</div>
   <div>
     <div class="topbar-title">Analisador de Emendas · Saúde 2026</div>
-    <div class="topbar-sub">Portaria GM/MS nº 10.297/2026 · Busca real + relatório completo</div>
+    <div class="topbar-sub">Versão auditada · interface pronta para backend real + análise completa da Portaria 10.297/2026</div>
   </div>
   <div class="topbar-pill">RP6 · 2026</div>
 </div>
@@ -203,22 +215,43 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <!-- TAB: BUSCA POR NÚMERO -->
   <div id="tabBusca">
     <div class="api-note">
-      <strong>🔑 Chave da API necessária</strong> para buscar dados reais.<br>
-      Obtenha gratuitamente em <a href="https://portaldatransparencia.gov.br/api-de-dados" target="_blank">portaldatransparencia.gov.br/api-de-dados</a> (cadastro com email gov ou CPF).<br>
-      Sem a chave, preencha os campos manualmente.
+      <strong>🔌 Busca via API local</strong>.<br>
+      Esta versão foi preparada para consultar uma API própria rodando no seu computador ou servidor.<br>
+      Você informa apenas o número da emenda ou da proposta e a API tenta buscar sozinha os dados oficiais e aplicar o fallback local quando necessário.<br>
+      A chave pode ser obtida em <a href="https://portaldatransparencia.gov.br/api-de-dados" target="_blank">portaldatransparencia.gov.br/api-de-dados</a>.
     </div>
     <div class="form-card">
       <div class="field">
-        <label>Chave da API (Portal da Transparência)</label>
-        <input type="text" id="inApiKey" placeholder="Cole aqui sua chave da API" oninput="salvarChave()"/>
+        <label>Como deseja pesquisar</label>
+        <div class="search-mode">
+          <div class="mode-chip active" id="modeAuto" onclick="setSearchMode('auto')">
+            <div class="mode-chip-title">Automático</div>
+            <div class="mode-chip-sub">Tenta tratar o número informado como emenda e também como proposta.</div>
+          </div>
+          <div class="mode-chip" id="modeManualNum" onclick="setSearchMode('manual')">
+            <div class="mode-chip-title">Preenchimento manual guiado</div>
+            <div class="mode-chip-sub">Use quando já souber o tipo ou quando a busca online não retornar.</div>
+          </div>
+        </div>
       </div>
       <div class="field">
-        <label>Código da Emenda</label>
+        <label>Chave da API (opcional nesta versão)</label>
+        <input type="text" id="inApiKey" placeholder="Ex: http://127.0.0.1:8000" value="http://127.0.0.1:8000"/>
+      </div>
+      <div class="field">
+        <label>Número da emenda ou da proposta</label>
         <input type="text" id="inEmenda" placeholder="Ex: 36000765503202600" oninput="onEmendaInput()"/>
       </div>
-      <button class="btn-main" id="btnBuscar" onclick="buscarEmenda()" style="background:linear-gradient(135deg,#16a34a,#15803d);box-shadow:0 2px 8px rgba(22,163,74,.3)">
-        🔎 Buscar Emenda
-      </button>
+      <div class="helper-note">
+        O sistema tenta <strong>identificar o tipo</strong> pelo número e pelo texto preenchido. Quando não tiver certeza, use os exemplos por tipo logo abaixo ou selecione o tipo manualmente.
+        <div class="quick-examples" id="quickExamples"></div>
+      </div>
+      <div class="inline-actions">
+        <button class="btn-main" id="btnBuscar" onclick="buscarEmenda()" style="background:linear-gradient(135deg,#16a34a,#15803d);box-shadow:0 2px 8px rgba(22,163,74,.3)">
+          🔎 Tentar busca online
+        </button>
+        <button class="btn-soft" type="button" onclick="limparBusca()">🧹 Limpar busca</button>
+      </div>
       <div class="fetch-status" id="fetchStatus"></div>
     </div>
 
@@ -286,10 +319,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <div class="welcome" id="welcome">
     <div class="welcome-icon">📋</div>
     <div class="welcome-title">Analisador de Emendas</div>
-    <div class="welcome-sub">Busque pelo número da emenda ou selecione o tipo de proposta para gerar o relatório completo.</div>
+    <div class="welcome-sub">Pesquise por número, escolha o tipo da proposta ou preencha os dados manualmente para gerar um relatório muito mais claro sobre o uso da verba.</div>
     <div class="welcome-hint">
-      <strong>🔍 Com o número:</strong> busca dados reais no Portal da Transparência (valor, município, autor, tipo).<br><br>
-      <strong>📋 Por tipo:</strong> selecione a modalidade e veja todas as regras da Portaria GM/MS 10.297/2026 para aquele tipo.
+      <strong>🔍 Busca por número:</strong> nesta versão a busca online é uma tentativa assistida e pode não retornar em todos os casos.<br><br>
+      <strong>📋 Análise por tipo:</strong> é a parte mais forte do sistema hoje e já entrega regras, checklist, alertas, terceirização, medicamentos, consórcios, passagens e outros casos especiais.
     </div>
   </div>
   <div class="loading" id="loading">
@@ -531,16 +564,31 @@ const TIPOS=[
 
 // Mapeamento código → tipo
 const CODIGO_TIPO={'2E89':'PAP','2E90':'MAC','8581':'INV_APS','8535':'INV_AE','20YJ':'ARBOVIROSES','21CF':'SAUDE_DIGITAL','20YD':'EDUCACAO','20YP':'INDIGENA'};
+const EXEMPLOS_TIPO={
+  PAP:'Exemplo de proposta PAP / incremento APS',
+  MAC:'Exemplo de proposta MAC / assistência especializada',
+  INV_APS:'Exemplo de estruturação de UBS / APS',
+  INV_AE:'Exemplo de estruturação de UPA, hospital ou CAPS',
+  TRANSPORTE:'Exemplo de transporte sanitário eletivo',
+  ARBOVIROSES:'Exemplo de proposta para controle de arboviroses',
+  ZOONOSES:'Exemplo de proposta para unidade de zoonoses',
+  IMUNIZACAO:'Exemplo de rede de frio / vacinação',
+  HIV_TB:'Exemplo de enfrentamento HIV, TB e IST',
+  MALARIA:'Exemplo de vigilância e controle da malária',
+  BRASIL_SAUDAVEL:'Exemplo de ações do Brasil Saudável',
+  SAUDE_DIGITAL:'Exemplo de saúde digital e telessaúde',
+  EDUCACAO:'Exemplo de educação em saúde / gestão do trabalho',
+  INDIGENA:'Exemplo de saúde indígena',
+  PAC:'Exemplo de obra do Novo PAC - Saúde'
+};
 
 // Estado
-let ckTotal=0,ckDone=0;
+let ckTotal=0,ckDone=0,searchMode='auto';
 
 // ─── INICIALIZAÇÃO ──────────────────────────────────────────────────
 window.onload = function(){
-  // Recuperar chave salva
   const k = localStorage.getItem('pdt_key')||'';
   if(k) document.getElementById('inApiKey').value=k;
-  // Montar cards de tipo
   const cont = document.getElementById('tipoCards');
   TIPOS.forEach(t=>{
     const d=document.createElement('div');
@@ -552,11 +600,75 @@ window.onload = function(){
       <div class="tipo-card-tags">${t.tags.map(tg=>`<span class="tipo-tag ${t.tc}">${tg}</span>`).join('')}</div></div>`;
     cont.appendChild(d);
   });
+  const quick=document.getElementById('quickExamples');
+  TIPOS.slice(0,8).forEach(t=>{
+    const b=document.createElement('button');
+    b.className='quick-pill';
+    b.type='button';
+    b.textContent=t.n.split('—')[0].trim();
+    b.onclick=()=>aplicarExemploTipo(t.id);
+    quick.appendChild(b);
+  });
 };
 
 function salvarChave(){
   const k=document.getElementById('inApiKey').value.trim();
   if(k.length>10) localStorage.setItem('pdt_key',k);
+}
+
+function setSearchMode(mode){
+  searchMode=mode;
+  document.getElementById('modeAuto').classList.toggle('active',mode==='auto');
+  document.getElementById('modeManualNum').classList.toggle('active',mode==='manual');
+  const btn=document.getElementById('btnBuscar');
+  const st=document.getElementById('fetchStatus');
+  if(mode==='manual'){
+    btn.disabled=true;
+    btn.style.opacity='.55';
+    st.className='fetch-status warn';
+    st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Preencha abaixo o município, o tipo, o valor, o autor e gere o relatório.';
+  }else{
+    btn.disabled=false;
+    btn.style.opacity='1';
+    st.className='fetch-status';
+    st.innerHTML='';
+  }
+}
+
+function limparBusca(){
+  ['inEmenda','inNome','inMunicipio','inValor','inAutor'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('inTipo').value='';
+  document.getElementById('fetchStatus').className='fetch-status';
+  document.getElementById('fetchStatus').innerHTML='';
+}
+
+function aplicarExemploTipo(tipo){
+  document.getElementById('inTipo').value=tipo;
+  document.getElementById('inNome').value=TIPOS.find(t=>t.id===tipo)?.n||'';
+  document.getElementById('inEmenda').value='';
+  document.getElementById('fetchStatus').className='fetch-status ok';
+  document.getElementById('fetchStatus').innerHTML='✅ Exemplo aplicado. Agora complete município, valor e autor, ou gere o relatório direto por tipo.';
+  switchTab('busca');
+}
+
+function detectarTipoInteligente(texto=''){
+  const t=(texto||'').toUpperCase();
+  for(const [k,tp] of Object.entries(CODIGO_TIPO)){if(t.includes(k)) return tp;}
+  if(/PAP|APS|ATENCAO PRIMARIA|ATENÇÃO PRIMÁRIA|UBS|ESF|ACS/.test(t)) return 'PAP';
+  if(/MAC|ATENCAO ESPECIALIZADA|ATENÇÃO ESPECIALIZADA|HOSPITAL|POLICLINICA|POLICLÍNICA|CONSULTA ESPECIALIZADA/.test(t)) return 'MAC';
+  if(/SAMU|UPA|CAPS|CER|AMBULANCIA|AMBULÂNCIA/.test(t)) return 'INV_AE';
+  if(/ESTRUTURACAO APS|ESTRUTURAÇÃO APS|CONSTRUCAO UBS|CONSTRUÇÃO UBS|REFORMA UBS/.test(t)) return 'INV_APS';
+  if(/ARBOVIROSE|DENGUE|ZIKA|CHIKUNGUNYA/.test(t)) return 'ARBOVIROSES';
+  if(/ZOONOSE/.test(t)) return 'ZOONOSES';
+  if(/VACINA|IMUNIZACAO|IMUNIZAÇÃO|REDE DE FRIO/.test(t)) return 'IMUNIZACAO';
+  if(/HIV|TUBERCULOSE|HEPATITE|IST/.test(t)) return 'HIV_TB';
+  if(/MALARIA|MALÁRIA/.test(t)) return 'MALARIA';
+  if(/DIGITAL|TELESSAUDE|TELESSAÚDE/.test(t)) return 'SAUDE_DIGITAL';
+  if(/EDUCACAO|EDUCAÇÃO|CAPACITACAO|CAPACITAÇÃO|RESIDENCIA|RESIDÊNCIA/.test(t)) return 'EDUCACAO';
+  if(/INDIGENA|INDÍGENA|SASISUS/.test(t)) return 'INDIGENA';
+  if(/TRANSPORTE SANITARIO|TRANSPORTE SANITÁRIO/.test(t)) return 'TRANSPORTE';
+  if(/PAC/.test(t)) return 'PAC';
+  return '';
 }
 
 function switchTab(t){
@@ -571,102 +683,59 @@ function selecionarTipo(tipo){
   const card=document.getElementById('tc_'+tipo);
   if(card){card.classList.add('selected');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
   document.getElementById('inTipo').value=tipo;
-  document.getElementById('inEmenda').value=tipo+'_EXEMPLO';
+  document.getElementById('inEmenda').value='';
   document.getElementById('inMunicipio').value='';
   document.getElementById('inValor').value='';
   document.getElementById('inAutor').value='';
-  document.getElementById('inNome').value=TIPOS.find(t=>t.id===tipo)?.n||'';
+  document.getElementById('inNome').value=TIPOS.find(t=>t.id===tipo)?.n||EXEMPLOS_TIPO[tipo]||'';
   analisar();
 }
 
 function onEmendaInput(){
   const v=document.getElementById('inEmenda').value.trim().toUpperCase();
-  for(const [k,tp] of Object.entries(CODIGO_TIPO)){
-    if(v.includes(k)){
-      document.getElementById('inTipo').value=tp;
-      break;
-    }
-  }
+  const tipo=detectarTipoInteligente(v);
+  if(tipo) document.getElementById('inTipo').value=tipo;
 }
 
 // ─── BUSCA NO PORTAL DA TRANSPARÊNCIA ──────────────────────────────
 async function buscarEmenda(){
-  const apiKey=document.getElementById('inApiKey').value.trim();
+  const apiBase=(document.getElementById('inApiKey').value.trim()||'http://127.0.0.1:8000').replace(/\/$/, '');
   const codigo=document.getElementById('inEmenda').value.trim();
-  if(!codigo){alert('Informe o código da emenda.');return;}
-
   const st=document.getElementById('fetchStatus');
-
-  if(!apiKey){
+  if(searchMode==='manual'){
     st.className='fetch-status warn';
-    st.innerHTML='⚠️ <strong>Sem chave da API.</strong> Preencha os campos manualmente e clique em "Gerar Relatório".';
+    st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Complete os campos abaixo e gere o relatório.';
     return;
   }
+  if(!codigo){alert('Informe o número da emenda ou da proposta.');return;}
 
   st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Buscando no Portal da Transparência...';
+  st.innerHTML='<div class="mini-spin"></div> Consultando API local...';
   document.getElementById('btnBuscar').disabled=true;
 
   try{
-    // Portal da Transparência — API de emendas parlamentares
-    const url=`https://api.portaldatransparencia.gov.br/api-de-dados/emendas?codigoEmenda=${encodeURIComponent(codigo)}&pagina=1`;
-    const res=await fetch(url,{
-      headers:{'chave-api-dados':apiKey,'Accept':'application/json'}
-    });
-
-    if(res.status===401){
-      st.className='fetch-status err';
-      st.innerHTML='❌ <strong>Chave da API inválida.</strong> Verifique sua chave no Portal da Transparência.';
-      document.getElementById('btnBuscar').disabled=false; return;
+    const res=await fetch(`${apiBase}/api/buscar?numero=${encodeURIComponent(codigo)}`);
+    if(!res.ok){
+      let msg='Não foi possível concluir a busca.';
+      try{ const err=await res.json(); msg=err.detail||msg; }catch(_e){}
+      throw new Error(msg);
     }
-    if(res.status===404||res.status===204){
-      st.className='fetch-status warn';
-      st.innerHTML='⚠️ <strong>Emenda não encontrada</strong> com este código. Preencha os campos manualmente.';
-      document.getElementById('btnBuscar').disabled=false; return;
-    }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
 
-    const dados=await res.json();
-    const lista=Array.isArray(dados)?dados:dados.data||[];
+    if(data.municipio) document.getElementById('inMunicipio').value=data.municipio+(data.uf?(' - '+data.uf):'');
+    if(data.valor_formatado) document.getElementById('inValor').value=data.valor_formatado;
+    else if(data.valor) document.getElementById('inValor').value='R$ '+Number(data.valor).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    if(data.autor) document.getElementById('inAutor').value=data.autor;
+    if(data.objeto) document.getElementById('inNome').value=data.objeto;
+    if(data.tipo) document.getElementById('inTipo').value=data.tipo;
 
-    if(!lista.length){
-      st.className='fetch-status warn';
-      st.innerHTML='⚠️ Nenhum resultado encontrado. Preencha os campos manualmente.';
-      document.getElementById('btnBuscar').disabled=false; return;
-    }
-
-    const em=lista[0];
-    // Mapear campos da API para nossos campos
-    const municipio=(em.nomeUnidadeOrcamentaria||em.municipio||em.nomeMunicipio||'');
-    const valor=em.valorEmpenhado||em.valorDotacaoAtualizada||em.valor||0;
-    const autor=em.nomeAutor||em.autor||'';
-    const objeto=em.objeto||em.descricao||em.nomeAcao||em.funcionalProgramatica||'';
-    const acao=em.codigoAcao||em.funcionalProgramatica||'';
-
-    // Preencher campos
-    document.getElementById('inMunicipio').value=municipio;
-    document.getElementById('inValor').value=valor?'R$ '+Number(valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'';
-    document.getElementById('inAutor').value=autor;
-    document.getElementById('inNome').value=objeto;
-
-    // Detectar tipo pelo código da ação
-    const aUp=(acao||objeto||'').toUpperCase();
-    let tipoDetectado='';
-    for(const [k,tp] of Object.entries(CODIGO_TIPO)){if(aUp.includes(k)){tipoDetectado=tp;break;}}
-    if(tipoDetectado) document.getElementById('inTipo').value=tipoDetectado;
-
-    st.className='fetch-status ok';
-    st.innerHTML=`✅ <strong>Emenda encontrada!</strong> Dados preenchidos automaticamente.${tipoDetectado?' Tipo detectado: <strong>'+tipoDetectado+'</strong>':''}`;
-
+    const obs=(data.observacoes||[]).slice(0,3).join(' | ');
+    const badge=data.status==='ok'?'✅':(data.status==='parcial'?'⚠️':'ℹ️');
+    st.className='fetch-status '+(data.status==='ok'?'ok':(data.status==='parcial'?'warn':'warn'));
+    st.innerHTML=`${badge} <strong>Busca concluída.</strong> Fonte: <strong>${data.fonte||'local'}</strong>. ${data.tipo_label?('Tipo sugerido: <strong>'+data.tipo_label+'</strong>. '):''}${data.confianca!==undefined?('Confiança: <strong>'+data.confianca+'%</strong>. '):''}${obs?('<br>'+obs):''}`;
   }catch(e){
-    // Se CORS error (arquivo local)
-    if(e.message.includes('Failed to fetch')||e.message.includes('NetworkError')){
-      st.className='fetch-status warn';
-      st.innerHTML='⚠️ <strong>Não foi possível buscar.</strong> A busca automática requer que o sistema esteja hospedado online (GitHub Pages). Preencha os campos manualmente ou publique o sistema online.';
-    }else{
-      st.className='fetch-status err';
-      st.innerHTML='❌ Erro ao buscar: '+e.message+'. Preencha os campos manualmente.';
-    }
+    st.className='fetch-status err';
+    st.innerHTML='❌ <strong>Falha ao consultar a API local.</strong> '+e.message+'<br>Confira se o backend está rodando em <strong>'+apiBase+'</strong>.';
   }
   document.getElementById('btnBuscar').disabled=false;
 }
