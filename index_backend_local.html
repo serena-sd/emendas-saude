@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisador de Emendas — Saúde 2026</title>
+<meta name="description" content="Analise emendas individuais RP6 de saúde. Relatório completo baseado na Portaria GM/MS 10.297/2026.">
+<style>
+:root{--bg:#f0f4f8;--white:#fff;--surface:#f8fafc;--border:#e2e8f0;--border2:#cbd5e1;--blue:#2563eb;--blue-light:#dbeafe;--blue-mid:#93c5fd;--green:#16a34a;--green-light:#dcfce7;--red:#dc2626;--red-light:#fee2e2;--orange:#ea580c;--orange-light:#ffedd5;--yellow:#ca8a04;--yellow-light:#fef9c3;--purple:#7c3aed;--purple-light:#ede9fe;--text:#0f172a;--text2:#334155;--muted:#64748b;--muted2:#94a3b8;--shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);--shadow-md:0 4px 6px rgba(0,0,0,.07)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:62px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);position:sticky;top:0;z-index:100}
+.topbar-logo{width:40px;height:40px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20pt;flex-shrink:0}
+.topbar-title{font-size:14pt;font-weight:700;color:var(--text)}
+.topbar-sub{font-size:8pt;color:var(--muted)}
+.topbar-pill{margin-left:auto;background:var(--blue-light);color:var(--blue);font-size:8pt;font-weight:700;padding:4px 12px;border-radius:20px}
+.app{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 62px)}
+.sidebar{background:var(--white);border-right:1px solid var(--border);padding:18px;overflow-y:auto}
+.content{padding:24px;overflow-y:auto}
+/* TABS */
+.tabs{display:flex;gap:4px;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:14px}
+.tab-btn{flex:1;background:transparent;border:none;border-radius:7px;padding:9px 8px;font-size:8.5pt;font-weight:700;cursor:pointer;color:var(--muted);transition:all .15s;font-family:inherit}
+.tab-btn.active{background:var(--white);color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tab-btn:hover:not(.active){color:var(--text)}
+/* FORM */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.field{margin-bottom:11px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:7.5pt;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.field input,.field select{width:100%;background:var(--white);border:1.5px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-size:9.5pt;transition:border-color .2s;font-family:inherit}
+.field input:focus,.field select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.field input::placeholder{color:var(--muted2)}
+.btn-main{width:100%;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:9px;padding:12px;font-size:10pt;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(37,99,235,.3);margin-top:4px}
+.btn-main:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-main:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+/* FETCH STATUS */
+.fetch-status{border-radius:8px;padding:9px 12px;margin-top:10px;font-size:8pt;display:none;line-height:1.5}
+.fetch-status.loading{display:flex;align-items:center;gap:8px;background:#eff6ff;border:1px solid #93c5fd;color:var(--blue)}
+.fetch-status.ok{display:block;background:#f0fdf4;border:1px solid #86efac;color:var(--green)}
+.fetch-status.warn{display:block;background:#fff7ed;border:1px solid #fdba74;color:var(--orange)}
+.fetch-status.err{display:block;background:#fff5f5;border:1px solid #fca5a5;color:var(--red)}
+.mini-spin{width:14px;height:14px;border:2px solid #93c5fd;border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* API KEY */
+.api-note{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 12px;font-size:8pt;color:#713f12;line-height:1.55;margin-bottom:11px}
+.api-note a{color:#1d4ed8;text-decoration:underline}
+/* TIPO CARDS */
+.tipo-card{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:all .15s;display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.tipo-card:hover{border-color:var(--blue);background:#f0f7ff;transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.tipo-card.selected{border-color:var(--blue);background:var(--blue-light)}
+.tipo-card-icon{font-size:17pt;flex-shrink:0;margin-top:1px}
+.tipo-card-name{font-size:8.5pt;font-weight:700;color:var(--text);margin-bottom:2px}
+.tipo-card-desc{font-size:7.3pt;color:var(--muted);line-height:1.4}
+.tipo-card-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.tipo-tag{font-size:6.5pt;font-weight:700;padding:2px 7px;border-radius:20px}
+/* SIDE RESULT */
+.side-result{display:none}
+.side-result.show{display:block}
+.result-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px}
+.rc-title{font-size:7.5pt;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+.rc-row{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:8.5pt}
+.rc-key{color:var(--muted);flex-shrink:0}
+.rc-val{font-weight:600;color:var(--text);text-align:right}
+.rc-val.green{color:var(--green)}.rc-val.blue{color:var(--blue)}.rc-val.orange{color:var(--orange)}
+/* WELCOME */
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:65vh;text-align:center;padding:40px}
+.welcome-icon{font-size:52pt;margin-bottom:16px}
+.welcome-title{font-size:22pt;font-weight:800;color:var(--text);margin-bottom:8px}
+.welcome-sub{font-size:11pt;color:var(--muted);max-width:480px;line-height:1.7}
+.welcome-hint{margin-top:20px;background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:10px;padding:14px 20px;font-size:9pt;color:var(--blue);max-width:480px;line-height:1.6}
+/* LOADING */
+.loading{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:65vh;padding:40px}
+.loading.show{display:flex}
+.spin-big{width:56px;height:56px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:20px}
+.load-title{font-size:14pt;font-weight:700;margin-bottom:6px}
+.load-sub{font-size:9pt;color:var(--muted);margin-bottom:24px}
+.steps-box{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 20px;width:100%;max-width:420px;box-shadow:var(--shadow-md)}
+.step{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:9pt;color:var(--muted2);border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.step.active{color:var(--blue);font-weight:600}
+.step.done{color:var(--green)}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0}
+.step.active .step-dot{background:var(--blue);animation:pulse 1s infinite}
+.step.done .step-dot{background:var(--green)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* REPORT */
+.report{display:none}
+.report.show{display:block}
+.rpt-header{background:linear-gradient(135deg,#1e3a5f,#1d4ed8 60%,#2563eb);border-radius:14px;padding:22px 26px;margin-bottom:18px;color:#fff}
+.rpt-id{font-size:7.5pt;opacity:.7;margin-bottom:4px;font-family:'Courier New',monospace}
+.rpt-title{font-size:16pt;font-weight:800;margin-bottom:16px;line-height:1.3}
+.rpt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.rpt-item{background:rgba(255,255,255,.13);border-radius:8px;padding:9px 12px}
+.rpt-label{font-size:7pt;opacity:.7;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.rpt-value{font-size:9.5pt;font-weight:700}
+.rpt-value.big{font-size:13pt;color:#86efac}
+/* SECTIONS */
+.sec{background:var(--white);border:1px solid var(--border);border-radius:12px;margin-bottom:13px;overflow:hidden;box-shadow:var(--shadow)}
+.sec-head{padding:13px 17px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:background .15s}
+.sec-head:hover{background:var(--surface)}
+.sec-icon{font-size:15pt;flex-shrink:0}
+.sec-title{font-size:10.5pt;font-weight:700;color:var(--text);flex:1}
+.sec-badges{display:flex;gap:5px}
+.badge{font-size:7.5pt;font-weight:700;padding:3px 9px;border-radius:20px}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-orange{background:var(--orange-light);color:var(--orange)}
+.badge-yellow{background:var(--yellow-light);color:var(--yellow)}
+.badge-purple{background:var(--purple-light);color:var(--purple)}
+.sec-chevron{color:var(--muted2);font-size:9pt;transition:transform .2s;margin-left:4px}
+.sec-chevron.open{transform:rotate(180deg)}
+.sec-body{padding:17px;display:none;border-top:1px solid var(--border)}
+.sec-body.open{display:block}
+/* RULES */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.rules-head{font-size:8.5pt;font-weight:700;padding:7px 11px;border-radius:8px;text-align:center;margin-bottom:9px}
+.rules-head.ok{background:var(--green-light);color:var(--green);border:1px solid #86efac}
+.rules-head.nok{background:var(--red-light);color:var(--red);border:1px solid #fca5a5}
+.rule{display:flex;gap:8px;padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:8.5pt;line-height:1.45}
+.rule.ok{background:#f0fdf4;border:1px solid #86efac;color:var(--text2)}
+.rule.nok{background:#fff5f5;border:1px solid #fca5a5;color:var(--text2)}
+.rule-ic{font-weight:800;flex-shrink:0;margin-top:1px}
+.rule.ok .rule-ic{color:var(--green)}.rule.nok .rule-ic{color:var(--red)}
+.rule-sub{font-size:7.5pt;color:var(--muted);margin-top:3px;font-style:italic}
+/* TOPICS */
+.topic{background:var(--white);border:1px solid var(--border);border-radius:10px;margin-bottom:9px;overflow:hidden}
+.topic-head{padding:11px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);background:var(--surface)}
+.topic-icon{font-size:13pt;flex-shrink:0}
+.topic-name{font-size:9.5pt;font-weight:700;color:var(--text);flex:1}
+.topic-body{padding:13px 15px;font-size:8.5pt;color:var(--text2)}
+.topic-body p{line-height:1.65;margin-bottom:9px}
+.topic-body strong{color:var(--text)}
+.mini-table{width:100%;border-collapse:collapse;margin:9px 0;font-size:8pt;border-radius:8px;overflow:hidden}
+.mini-table th{background:#f1f5f9;color:var(--text2);padding:6px 10px;text-align:left;font-size:7.5pt;font-weight:700;border-bottom:2px solid var(--border)}
+.mini-table td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+.mini-table tr:last-child td{border-bottom:none}
+.mini-table tr:nth-child(even) td{background:#f8fafc}
+.ok-cell{color:var(--green);font-weight:700}.nok-cell{color:var(--red);font-weight:700}.warn-cell{color:var(--orange);font-weight:700}
+.flow-row{display:flex;align-items:center;gap:5px;margin:8px 0;flex-wrap:wrap}
+.fbox{padding:4px 10px;border-radius:6px;font-size:8pt;font-weight:600}
+.fbox.green{background:var(--green-light);color:var(--green);border:1px solid #86efac}
+.fbox.blue{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-mid)}
+.fbox.red{background:var(--red-light);color:var(--red);border:1px solid #fca5a5}
+/* ALERTS */
+.alert{border-radius:9px;padding:12px 14px;margin-bottom:8px;display:flex;gap:11px}
+.alert.danger{background:#fff5f5;border:1px solid #fca5a5}
+.alert.warning{background:#fff7ed;border:1px solid #fdba74}
+.alert.info{background:#eff6ff;border:1px solid #93c5fd}
+.alert-emoji{font-size:15pt;flex-shrink:0}
+.alert-title{font-size:9pt;font-weight:700;margin-bottom:3px}
+.alert.danger .alert-title{color:var(--red)}.alert.warning .alert-title{color:var(--orange)}.alert.info .alert-title{color:var(--blue)}
+.alert-desc{font-size:8.5pt;color:var(--text2);line-height:1.6}
+/* CHECKLIST */
+.cl-progress{background:var(--border);border-radius:20px;height:7px;margin-bottom:5px;overflow:hidden}
+.cl-bar{height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:20px;transition:width .3s}
+.cl-pct{font-size:8pt;color:var(--muted);text-align:right;margin-bottom:13px}
+.cl-group{margin-bottom:15px}
+.cl-group-title{font-size:7.5pt;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--surface);border-radius:6px;margin-bottom:6px;border-left:3px solid var(--blue)}
+.cl-item{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:8px;margin-bottom:5px;border:1.5px solid var(--border);cursor:pointer;transition:all .15s;background:var(--white)}
+.cl-item:hover{border-color:var(--blue);background:#eff6ff}
+.cl-item.done{background:#f0fdf4;border-color:#86efac}
+.cl-box{width:19px;height:19px;border:2px solid var(--border2);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11pt;margin-top:1px}
+.cl-item.done .cl-box{background:var(--green);border-color:var(--green);color:#fff}
+.cl-main{font-size:9pt;color:var(--text);font-weight:600}
+.cl-sub{font-size:7.5pt;color:var(--muted);margin-top:2px}
+.cl-art{font-size:7pt;color:var(--blue);margin-top:1px;font-family:'Courier New',monospace}
+/* PLANO */
+.plano-field{margin-bottom:13px}
+.plano-label{font-size:8pt;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.plano-text{background:var(--surface);border:1.5px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:9pt;color:var(--text2);line-height:1.65;white-space:pre-line}
+.plano-text.editable{border-left:3px solid var(--blue);background:#eff6ff}
+.btn-copy{background:var(--green-light);border:1px solid #86efac;color:var(--green);border-radius:8px;padding:9px 15px;font-size:9pt;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;margin-top:10px}
+.btn-copy:hover{background:var(--green);color:#fff;border-color:var(--green)}
+.info-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:9px;padding:11px 13px;margin-bottom:13px;font-size:8.5pt;color:var(--blue);line-height:1.6}
+.conseq-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.conseq-item{background:#fff5f5;border:1px solid #fca5a5;border-radius:9px;padding:12px 14px}
+.conseq-icon{font-size:17pt;margin-bottom:5px}
+.conseq-title{font-size:9pt;font-weight:700;color:var(--red);margin-bottom:3px}
+.conseq-desc{font-size:8pt;color:var(--text2);line-height:1.55}
+.footer-note{font-size:7.5pt;color:var(--muted2);text-align:center;padding:16px;border-top:1px solid var(--border);margin-top:8px;font-style:italic}
+.search-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mode-chip{border:1.5px solid var(--border2);background:var(--white);border-radius:9px;padding:10px 11px;cursor:pointer;transition:all .15s}
+.mode-chip.active{border-color:var(--blue);background:#eff6ff;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.mode-chip-title{font-size:8pt;font-weight:700;color:var(--text);margin-bottom:2px}
+.mode-chip-sub{font-size:7.2pt;color:var(--muted);line-height:1.4}
+.helper-note{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:7.8pt;color:var(--text2);line-height:1.55;margin-top:10px}
+.quick-examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.quick-pill{border:none;background:#e2e8f0;color:#334155;border-radius:999px;padding:6px 9px;font-size:7.4pt;font-weight:700;cursor:pointer;transition:all .15s}
+.quick-pill:hover{background:#dbeafe;color:#1d4ed8}
+.inline-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.btn-soft{width:100%;background:var(--white);color:var(--text2);border:1.5px solid var(--border2);border-radius:9px;padding:10px;font-size:9pt;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-soft:hover{border-color:var(--blue);color:var(--blue);background:#eff6ff}
+@media(max-width:900px){.app{grid-template-columns:1fr}.rpt-grid{grid-template-columns:1fr 1fr}.rules-grid{grid-template-columns:1fr}.conseq-grid{grid-template-columns:1fr}.search-mode{grid-template-columns:1fr}.inline-actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-logo">🏥</div>
+  <div>
+    <div class="topbar-title">Analisador de Emendas · Saúde 2026</div>
+    <div class="topbar-sub">Versão auditada · interface pronta para backend real + análise completa da Portaria 10.297/2026</div>
+  </div>
+  <div class="topbar-pill">RP6 · 2026</div>
+</div>
+<div class="app">
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<div class="sidebar">
+  <div class="tabs">
+    <button class="tab-btn active" id="tbBusca" onclick="switchTab('busca')">🔍 Buscar por Número</button>
+    <button class="tab-btn" id="tbTipo"  onclick="switchTab('tipo')">📋 Por Tipo</button>
+  </div>
+
+  <!-- TAB: BUSCA POR NÚMERO -->
+  <div id="tabBusca">
+    <div class="api-note">
+      <strong>🔌 Busca via API local</strong>.<br>
+      Esta versão foi preparada para consultar uma API própria rodando no seu computador ou servidor.<br>
+      Você informa apenas o número da emenda ou da proposta e a API tenta buscar sozinha os dados oficiais e aplicar o fallback local quando necessário.<br>
+      A chave pode ser obtida em <a href="https://portaldatransparencia.gov.br/api-de-dados" target="_blank">portaldatransparencia.gov.br/api-de-dados</a>.
+    </div>
+    <div class="form-card">
+      <div class="field">
+        <label>Como deseja pesquisar</label>
+        <div class="search-mode">
+          <div class="mode-chip active" id="modeAuto" onclick="setSearchMode('auto')">
+            <div class="mode-chip-title">Automático</div>
+            <div class="mode-chip-sub">Tenta tratar o número informado como emenda e também como proposta.</div>
+          </div>
+          <div class="mode-chip" id="modeManualNum" onclick="setSearchMode('manual')">
+            <div class="mode-chip-title">Preenchimento manual guiado</div>
+            <div class="mode-chip-sub">Use quando já souber o tipo ou quando a busca online não retornar.</div>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Chave da API (opcional nesta versão)</label>
+        <input type="text" id="inApiKey" placeholder="Ex: http://127.0.0.1:8000" value="http://127.0.0.1:8000"/>
+      </div>
+      <div class="field">
+        <label>Número da emenda ou da proposta</label>
+        <input type="text" id="inEmenda" placeholder="Ex: 36000765503202600" oninput="onEmendaInput()"/>
+      </div>
+      <div class="helper-note">
+        O sistema tenta <strong>identificar o tipo</strong> pelo número e pelo texto preenchido. Quando não tiver certeza, use os exemplos por tipo logo abaixo ou selecione o tipo manualmente.
+        <div class="quick-examples" id="quickExamples"></div>
+      </div>
+      <div class="inline-actions">
+        <button class="btn-main" id="btnBuscar" onclick="buscarEmenda()" style="background:linear-gradient(135deg,#16a34a,#15803d);box-shadow:0 2px 8px rgba(22,163,74,.3)">
+          🔎 Tentar busca online
+        </button>
+        <button class="btn-soft" type="button" onclick="limparBusca()">🧹 Limpar busca</button>
+      </div>
+      <div class="fetch-status" id="fetchStatus"></div>
+    </div>
+
+    <div class="form-card" id="formManual">
+      <div style="font-size:8pt;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✏️ Dados da Emenda</div>
+      <div class="field"><label>Nome / Objeto da Emenda</label>
+        <input type="text" id="inNome" placeholder="Ex: Incremento PAP — Atenção Primária"/></div>
+      <div class="field"><label>Município</label>
+        <input type="text" id="inMunicipio" placeholder="Ex: Cidreira — RS"/></div>
+      <div class="field"><label>Tipo da Proposta</label>
+        <select id="inTipo">
+          <option value="">— Selecione —</option>
+          <optgroup label="CUSTEIO">
+            <option value="PAP">Incremento PAP — Atenção Primária (APS)</option>
+            <option value="MAC">Incremento MAC — Atenção Especializada</option>
+          </optgroup>
+          <optgroup label="INVESTIMENTO">
+            <option value="INV_APS">Estruturação APS (UBS, veículos, equipamentos)</option>
+            <option value="INV_AE">Estruturação Atenção Especializada (UPA, SAMU...)</option>
+            <option value="TRANSPORTE">Transporte Sanitário Eletivo</option>
+          </optgroup>
+          <optgroup label="VIGILÂNCIA">
+            <option value="ARBOVIROSES">Arboviroses (dengue, zika, chikungunya)</option>
+            <option value="ZOONOSES">Vigilância de Zoonoses</option>
+            <option value="IMUNIZACAO">Imunização / Rede de Frio</option>
+            <option value="HIV_TB">HIV/Aids, Tuberculose, Hepatites, IST</option>
+            <option value="MALARIA">Malária</option>
+            <option value="BRASIL_SAUDAVEL">Brasil Saudável — Eliminação 2030</option>
+          </optgroup>
+          <optgroup label="OUTROS">
+            <option value="SAUDE_DIGITAL">Saúde Digital / Telessaúde</option>
+            <option value="EDUCACAO">Gestão do Trabalho / Educação em Saúde</option>
+            <option value="INDIGENA">Saúde Indígena — SasiSUS</option>
+            <option value="PAC">Novo PAC — Eixo Saúde</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field"><label>Valor</label>
+        <input type="text" id="inValor" placeholder="Ex: R$ 400.000,00"/></div>
+      <div class="field"><label>Autor da Emenda</label>
+        <input type="text" id="inAutor" placeholder="Ex: Dep. João Silva"/></div>
+      <button class="btn-main" id="btnAnalisar" onclick="analisar()">⚡ Gerar Relatório Completo</button>
+    </div>
+  </div>
+
+  <!-- TAB: POR TIPO -->
+  <div id="tabTipo" style="display:none">
+    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:8pt;color:#92400e;line-height:1.5">
+      <strong>💡 Não tem o número?</strong> Clique no tipo de proposta para gerar o relatório completo com todas as regras, exemplos e checklist.
+    </div>
+    <div id="tipoCards"></div>
+  </div>
+
+  <!-- RESULTADO LATERAL -->
+  <div class="side-result" id="sideResult">
+    <div class="result-card">
+      <div class="rc-title">📊 Emenda Analisada</div>
+      <div id="rcContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CONTENT ═══════════════ -->
+<div class="content">
+  <div class="welcome" id="welcome">
+    <div class="welcome-icon">📋</div>
+    <div class="welcome-title">Analisador de Emendas</div>
+    <div class="welcome-sub">Pesquise por número, escolha o tipo da proposta ou preencha os dados manualmente para gerar um relatório muito mais claro sobre o uso da verba.</div>
+    <div class="welcome-hint">
+      <strong>🔍 Busca por número:</strong> nesta versão a busca online é uma tentativa assistida e pode não retornar em todos os casos.<br><br>
+      <strong>📋 Análise por tipo:</strong> é a parte mais forte do sistema hoje e já entrega regras, checklist, alertas, terceirização, medicamentos, consórcios, passagens e outros casos especiais.
+    </div>
+  </div>
+  <div class="loading" id="loading">
+    <div class="spin-big"></div>
+    <div class="load-title" id="loadTitle">Buscando emenda...</div>
+    <div class="load-sub" id="loadSub">Consultando o Portal da Transparência</div>
+    <div class="steps-box">
+      <div class="step" id="s1"><div class="step-dot"></div><span id="s1t">Consultando Portal da Transparência</span></div>
+      <div class="step" id="s2"><div class="step-dot"></div><span id="s2t">Identificando tipo e capítulo da portaria</span></div>
+      <div class="step" id="s3"><div class="step-dot"></div><span id="s3t">Mapeando regras de uso</span></div>
+      <div class="step" id="s4"><div class="step-dot"></div><span id="s4t">Gerando checklist de auditoria</span></div>
+      <div class="step" id="s5"><div class="step-dot"></div><span id="s5t">Montando relatório completo</span></div>
+    </div>
+  </div>
+  <div class="report" id="report"></div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// BASE DE CONHECIMENTO COMPLETA — PORTARIA GM/MS 10.297/2026
+// ═══════════════════════════════════════════════════════════
+const BASE = {
+PAP:{cap:"I",arts:"16 a 21",acao:"10.301.5119.2E89",gnd:"GND 3 — Custeio",modal:"41",
+  nome:"Incremento Temporário ao Custeio da APS — PAP",natureza:"CUSTEIO",
+  limite:"Até 100% do total PAP + ACS recebido em 2025 (+20% se IVS > 0,3)",parcelas:"Até 6 parcelas",
+  pode:[
+    {t:"Custeio operacional das UBS: energia, água, limpeza, vigilância e pequenos reparos",s:"Despesas diretas do funcionamento diário das unidades"},
+    {t:"Contratos com empresas (CNPJ) via licitação para serviços médicos — Elemento 39 (Serviços de Terceiros PJ)",s:"Diferente do Elemento 31 (folha). Empresa licita, presta o serviço, recebe pelo resultado."},
+    {t:"Insumos, medicamentos e materiais de consumo para APS, respeitando REMUME",s:"Curativos, descartáveis, EPIs, kits de ACS, medicamentos da lista municipal"},
+    {t:"Exames vinculados à APS: coleta, preventivo, rastreamento, testes rápidos",s:"Procedimentos realizados nas UBS ou em parceria contratada com CNES ativo"},
+    {t:"Educação permanente e capacitações para equipes da APS (ESF, ACS, NASF, eMulti)",s:"Cursos, treinamentos técnicos, qualificação de profissionais"},
+    {t:"Vigilância em saúde integrada à APS: visitas domiciliares, campanhas, busca ativa, endemias",s:"Ações preventivas das equipes de APS"},
+    {t:"Ações previstas no Plano Municipal de Saúde e PAS vigentes",s:"Compatibilidade obrigatória com o planejamento aprovado pelo Conselho de Saúde"},
+    {t:"Serviços de apoio diagnóstico (laboratório) via contrato formal com metas mensais",s:"CNES ativo, contrato, relatório de produção — pagamento por resultado"},
+    {t:"Ações estruturantes e prioritárias da APS definidas em portaria específica do MS (Art. 19)",s:"Programas nacionais de fortalecimento da Atenção Básica"}
+  ],
+  naopode:[
+    {t:"Salários, encargos (INSS, FGTS), gratificações, férias, 13º, plantões como CPF — Elemento 31",s:"Art. 93 — vedação absoluta para todas as emendas RP6. Gera devolução + TCE."},
+    {t:"Aquisição de equipamentos permanentes (GND 4) — esta emenda é exclusivamente GND 3",s:"Para equipamentos use proposta de Estruturação APS (Cap. III, ação 8581)"},
+    {t:"Obras de construção, ampliação ou reforma de unidades",s:"Obras são GND 4. Use proposta de Estruturação (Cap. III)."},
+    {t:"Veículos de qualquer tipo (carros, vans, ambulâncias)",s:"Veículos são GND 4. Use Cap. III, IV ou V."},
+    {t:"Compra de passagens aéreas ou rodoviárias — não previsto na portaria",s:"Use TFD com recurso próprio. Passagem com emenda PAP = alto risco de glosa."},
+    {t:"Repasse direto da emenda para empresa com fins lucrativos — Art. 98",s:"Empresa presta o serviço, mas não recebe a emenda diretamente."},
+    {t:"Consórcio como beneficiário direto — Art. 18 §único",s:"Fluxo correto: emenda→FMS→contrato→consórcio executa. Nunca emenda→consórcio direto."},
+    {t:"Despesas genéricas sem objeto, justificativa e metas — Art. 94",s:"Todo gasto precisa de objeto claro, justificativa técnica e indicadores verificáveis."},
+    {t:"Criação de despesa ou serviço permanente com recurso temporário — Art. 31",s:"A emenda é temporária. Contratos não podem gerar obrigação financeira contínua."},
+    {t:"Substituição de recurso próprio por emenda para despesas já previstas no orçamento",s:"A emenda é incremento, não substituto. Configura desvio de finalidade."}
+  ],
+  checklist:[
+    {g:"Planejamento",items:[
+      {t:"Plano de Trabalho com os 5 elementos do Art. 7º",s:"Objeto, justificativa, metas (quant./qual.), despesas e CNES",a:"Art. 7º"},
+      {t:"Compatível com Plano Municipal de Saúde vigente",s:"Aprovado pelo Conselho; se necessário, adequar o PAS antes de executar",a:"Art. 6º"},
+      {t:"Valor dentro do limite PAP+ACS de 2025",s:"Verificar teto no portal do FNS antes de cadastrar",a:"Art. 17"},
+      {t:"Proposta cadastrada e aprovada no InvestSUS",s:"Obrigatório antes de qualquer execução",a:"Art. 4º"}
+    ]},
+    {g:"Aprovações",items:[
+      {t:"Deliberação da CIR obtida",s:"Sem CIR a execução financeira fica bloqueada",a:"Art. 10"},
+      {t:"Resolução da CIB aprovada",s:"Condição obrigatória para execução",a:"Art. 10"},
+      {t:"Proposta submetida ao Conselho Municipal de Saúde",s:"Alterações no PAS precisam ser apresentadas ao Conselho",a:"Art. 10"}
+    ]},
+    {g:"Conta Bancária",items:[
+      {t:"Conta corrente específica aberta no Transferegov.br",s:"Nunca usar conta geral da prefeitura",a:"Art. 12"},
+      {t:"Conta exclusiva — sem outros recursos depositados",s:"Misturar fontes é vedação expressa",a:"Art. 12 §5º"},
+      {t:"Domicílio bancário preservado (não alterar banco)",s:"Alteração é expressamente vedada",a:"Art. 14"},
+      {t:"Escrituração individualizando a emenda",s:"Mesmo se a conta for compartilhada por emendas do mesmo objeto",a:"Art. 12 §3º"}
+    ]},
+    {g:"Contratos e Execução",items:[
+      {t:"Todos os contratos têm objeto, metas e produção mensurável",s:"Pagamento por disponibilidade sem resultado = irregular",a:"Art. 7º+31"},
+      {t:"Terceirizações verificadas: Elemento 39 (não 31)",s:"Elem. 31=folha=vedado. Elem. 39=serviço de terceiros PJ=permitido",a:"Art. 93+MCASP"},
+      {t:"Nenhum contrato firmado com empresa lucrativa como beneficiária direta",s:"Empresa pode prestar o serviço, mas a emenda chega ao FMS",a:"Art. 98"},
+      {t:"Relatório mensal de produção de todos os prestadores",s:"Documenta execução real; evita glosa",a:"Art. 31"}
+    ]},
+    {g:"CNES e Sistemas",items:[
+      {t:"CNES dos estabelecimentos ativo e atualizado",s:"Unidade sem CNES ativo não pode receber recurso",a:"Art. 7º V"},
+      {t:"Produção registrada corretamente no SIA/SUS",s:"Inconsistências = impedimento técnico à emenda",a:"Art. 100"},
+      {t:"InvestSUS Gestão atualizado (situação, %, data)",s:"Ausência de atualização = inconsistência de monitoramento",a:"Art. 105"}
+    ]},
+    {g:"Prestação de Contas",items:[
+      {t:"Execução no RAG submetido ao Conselho de Saúde",s:"Comprovação anual obrigatória",a:"Art. 97"},
+      {t:"Notas fiscais, empenhos e atestes arquivados",s:"Pagamento sem documentação = irregularidade grave",a:"Art. 97"},
+      {t:"Nenhuma despesa enquadrada como Elemento 31",s:"Férias, 13º, encargos, salários, plantões como CPF — todos vedados",a:"Art. 93"}
+    ]}
+  ],
+  alertas:[
+    {tipo:"danger",titulo:"VEDAÇÃO ABSOLUTA — Pagamento de Pessoal (Art. 93)",desc:"Proibido: salários, INSS, FGTS, gratificações, férias, 13º, adicionais e plantões como CPF. Descumprimento = devolução ao FNS + TCE."},
+    {tipo:"danger",titulo:"Repasse direto para empresa lucrativa — Art. 98",desc:"Fluxo correto: <strong>emenda→FMS→licitação→empresa presta serviço→município paga pelo resultado.</strong> Emenda→empresa direta = irregularidade grave."},
+    {tipo:"danger",titulo:"Consórcio não pode ser beneficiário direto — Art. 18",desc:"Fluxo correto: <strong>emenda→FMS→contrato→consórcio executa.</strong> Repasse direto ao consórcio = irregular."},
+    {tipo:"warning",titulo:"Terceirização: Elemento 31 (vedado) × Elemento 39 (permitido)",desc:"Art. 93 veda Elemento <strong>31</strong> (folha direta). Contrato com CNPJ via licitação = Elemento <strong>39</strong> = permitido como custeio APS."},
+    {tipo:"warning",titulo:"Passagem comercial — alto risco de glosa",desc:"<strong>Não previsto</strong> na Portaria 10.297/2026. Use recurso próprio para TFD. Pagar passagem com emenda PAP = glosa + devolução."},
+    {tipo:"warning",titulo:"Metas OBRIGATÓRIAS no plano — Art. 7º",desc:"Metas quantitativas e/ou qualitativas são obrigatórias. Contratos sem meta = irregulares e sujeitos a glosa."},
+    {tipo:"info",titulo:"Caráter temporário — Art. 31",desc:"Recursos são temporários. Contratos não podem gerar obrigação financeira permanente após a emenda."},
+    {tipo:"info",titulo:"InvestSUS Gestão — Art. 105",desc:"Atualizar: situação (não iniciado/em execução/finalizado), % de execução física e data. Ausência = inconsistência de monitoramento."}
+  ],
+  topicos:{
+    terceirizacao:{n:"Terceirização de Serviços Médicos",i:"💉",s:"PERMITIDO COM CONDIÇÕES",
+      r:"O Art. 93 veda o <strong>Elemento 31</strong> (folha direta: servidores, plantões como CPF). Contrato com empresa (CNPJ) via licitação é o <strong>Elemento 39 — Outros Serviços de Terceiros PJ</strong>, permitido como custeio APS. O contrato deve ter metas de produção e pagamento por resultado comprovado.",
+      fok:"Emenda → FMS → Licitação/Contrato (Elem.39) → Empresa presta → Município paga pelo resultado",
+      fnok:"Emenda → Empresa direto (Art.98) | Plantão como CPF (Art.93 Elem.31)",
+      tab:[{s:"Contrato empresa (CNPJ) via licitação",p:"SIM",o:"Elemento 39 — Outros Serviços de Terceiros PJ"},{s:"Plantão médico como CPF",p:"NÃO",o:"Art. 93 — Elemento 31 vedado"},{s:"Contrato com cooperativa médica (CNPJ)",p:"SIM",o:"Elemento 39"},{s:"Pagamento de CLT ou salário",p:"NÃO",o:"Art. 93 — Elemento 31"},{s:"Repasse direto a empresa lucrativa",p:"NÃO",o:"Art. 98 — vedado"},{s:"Contrato com Santa Casa/filantrópica",p:"SIM",o:"Contrato com metas obrigatório"},{s:"Contrato sem meta de produção",p:"NÃO",o:"Art. 31 — exige resultado comprovado"}]},
+    medicamentos:{n:"Medicamentos e Insumos",i:"💊",s:"PERMITIDO COM CONDIÇÕES",
+      r:"A compra de medicamentos e insumos é permitida para emendas PAP, desde que compatível com REMUME/RENAME, com processo licitatório regular e controle de distribuição documentado.",
+      tab:[{s:"Medicamentos da REMUME para APS",p:"SIM",o:"Vinculado à política pública"},{s:"Insumos e materiais de consumo para UBS",p:"SIM",o:"Curativos, descartáveis, EPIs"},{s:"Medicamentos de alto custo/componente especializado",p:"SIM (MAC)",o:"Deve estar no plano do MAC, não PAP"},{s:"Fora de qualquer lista pública",p:"RISCO",o:"Justificativa técnica obrigatória"},{s:"Sem licitação ou dispensa justificada",p:"NÃO",o:"Lei 14.133/2021 obrigatória"}]},
+    passagens:{n:"Compra de Passagens",i:"✈️",s:"NÃO PREVISTO — ALTO RISCO",
+      r:"A Portaria 10.297/2026 <strong>não prevê passagens</strong> como despesa elegível. Regra: só pode o que está previsto. Em auditoria: 'qual artigo autoriza?' — não há resposta. O único transporte previsto é a aquisição de veículos (GND 4, Caps. III-V).",
+      tab:[{s:"Passagem para paciente em TFD",p:"NÃO",o:"Use recurso próprio ou fundo estadual de TFD"},{s:"Passagem para servidor em capacitação",p:"NÃO",o:"Use recurso próprio municipal"},{s:"Van/micro para pacientes eletivos",p:"SIM (Cap.V)",o:"Proposta de Transporte Sanitário Eletivo (GND 4)"},{s:"Ambulância para remoção",p:"SIM (Cap.IV)",o:"Proposta de Estruturação AE (GND 4)"}]},
+    consorcios:{n:"Consórcios Públicos de Saúde",i:"🤝",s:"PERMITIDO COM RESTRIÇÕES",
+      r:"Consórcio <strong>não pode ser beneficiário direto</strong> (Art. 18 §único). Fluxo correto: município recebe no FMS, contrata o consórcio e este executa o serviço mediante contrato formal com metas.",
+      fok:"Emenda → FMS → Contrato formal → Consórcio executa o serviço",
+      fnok:"Emenda → Consórcio diretamente (Art. 18 — IRREGULAR)",
+      tab:[{s:"Município paga consórcio por serviços realizados",p:"SIM",o:"Contrato formal com metas obrigatório"},{s:"Repasse fixo mensal sem controle de produção",p:"NÃO",o:"Sem meta = despesa genérica = irregular"},{s:"Taxa administrativa ou rateio genérico",p:"NÃO",o:"Deve ser pagamento por serviço prestado"},{s:"Consórcio como beneficiário direto",p:"NÃO",o:"Art. 18 §único — vedação expressa"}]},
+    ambulatorial:{n:"Serviços Ambulatoriais",i:"🏨",s:"PERMITIDO COM METAS",
+      r:"Custeio ambulatorial é permitido mas o capítulo depende do nível: APS cobre básico e exames de atenção primária; MAC cobre especialidades, cirurgias e procedimentos. Pagamento sempre por produção comprovada.",
+      tab:[{s:"Consultas APS e exames básicos",p:"SIM (PAP)",o:"Metas mensais de produção"},{s:"Consultas especializadas",p:"SIM (MAC)",o:"Contrato+metas+CNES+Teto MAC"},{s:"Cirurgias eletivas em filantrópica",p:"SIM (MAC)",o:"Contrato+metas+cláusula temporária"},{s:"Tomografia via UMAE",p:"SIM (MAC)",o:"CIR+CIB; execução via AgSUS"},{s:"Pagamento por disponibilidade sem produção",p:"NÃO",o:"Art. 31 — irregular, sujeito a glosa"},{s:"Sem CNES ativo do prestador",p:"NÃO",o:"CNES ativo é condição indispensável"}]},
+    folha:{n:"Pagamento de Pessoal (Folha)",i:"🚫",s:"VEDAÇÃO ABSOLUTA — Art. 93",
+      r:"<strong>Vedação absoluta e sem exceção</strong> para todas as emendas RP6. Inclui salários, encargos, gratificações, adicionais, férias, 13º, plantões como CPF. Mais fiscalizado pelo TCE/CGU.",
+      tab:[{s:"Salários e remunerações",p:"NÃO",o:"Art. 93 — absoluto"},{s:"INSS patronal e FGTS",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Gratificações e adicionais",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Férias e 13º salário",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Plantões como CPF",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Contrato empresa CNPJ (Elem. 39)",p:"SIM",o:"Não é folha — é serviço de terceiros"}]},
+    conta:{n:"Conta Bancária Específica",i:"🏦",s:"OBRIGAÇÃO CRÍTICA — Arts. 12-14",
+      r:"Conta específica no Transferegov.br obrigatória. Vedado: usar conta geral, transferir para outra conta, depositar outros recursos. Toda movimentação deve identificar origem e aplicação de cada emenda.",
+      tab:[{s:"Conta específica no Transferegov.br",p:"OBRIGATÓRIO",o:"Art. 12 — sem isso: bloqueio"},{s:"Usar conta geral da prefeitura",p:"NÃO",o:"Art. 12 — conta exclusiva"},{s:"Transferir para outra conta",p:"NÃO",o:"Art. 13 — execução na conta original"},{s:"Alterar domicílio bancário",p:"NÃO",o:"Art. 14 — vedado expressamente"},{s:"Depositar outros recursos",p:"NÃO",o:"Art. 12 §5º — segregação obrigatória"},{s:"Uma conta para emendas do mesmo objeto",p:"SIM",o:"Art. 12 §1º — com identificação individual"}]},
+    veiculos:{n:"Veículos e Ambulâncias",i:"🚑",s:"NÃO PERMITIDO — PAP é GND 3",
+      r:"<strong>Esta emenda PAP é exclusivamente GND 3 (custeio) e não permite veículos.</strong> Veículos são GND 4. Use proposta específica dos Caps. III, IV ou V.",
+      tab:[{s:"Veículo com emenda PAP",p:"NÃO",o:"PAP = GND 3. Veículo = GND 4."},{s:"Ambulância SAMU",p:"SIM (Cap.IV)",o:"Ação 8535/GND 4 — proposta específica"},{s:"Van transporte pacientes eletivos",p:"SIM (Cap.V)",o:"Ação 8581/8535/GND 4"},{s:"Carro para equipe APS",p:"SIM (Cap.III)",o:"Ação 8581/GND 4"}]},
+    obras:{n:"Obras e Equipamentos",i:"🏗️",s:"NÃO PERMITIDO — PAP é GND 3",
+      r:"<strong>PAP é exclusivamente GND 3 (custeio). Obras e equipamentos são GND 4.</strong> Use proposta de Estruturação (Cap. III para APS, Cap. IV para AE). Exceção: pequenos reparos de manutenção predial leve são custeio.",
+      tab:[{s:"Construção/reforma de UBS",p:"SIM (Cap.III)",o:"Ação 8581/GND 4 — proposta específica"},{s:"Equipamentos para UBS (SIGEM/RENEM)",p:"SIM (Cap.III)",o:"Ação 8581/GND 4"},{s:"Manutenção predial leve (não obra)",p:"SIM (PAP)",o:"Custeio operacional — pode com PAP"},{s:"Comprar equipamento com emenda PAP",p:"NÃO",o:"PAP = GND 3. Equipamento = GND 4."}]}
+  },
+  plano:{obj:"Incremento temporário ao custeio dos serviços de Atenção Primária à Saúde — PAP, para manutenção, qualificação e ampliação das ações e serviços nas Unidades Básicas de Saúde e equipes de Saúde da Família, com cumprimento de metas assistenciais, conforme Plano Municipal de Saúde e PAS vigentes.",
+    just:"O município apresenta demanda crescente por serviços de APS, com necessidade de reforço no custeio das UBS, na contratação de serviços e no fornecimento de insumos. O incremento ao PAP visa suprir este gap, ampliando a oferta e qualificando o atendimento.",
+    mq:"• Manter cobertura mínima de [X]% nas ESFs\n• Realizar [X] atendimentos de APS por mês\n• Executar [X] ações de vigilância em saúde\n• Garantir [X] atendimentos ambulatoriais por mês",
+    mqual:"• Qualificação com adoção de protocolos clínicos\n• Melhoria do tempo de espera para consultas\n• Satisfação do usuário: meta de [X]%\n• Implantação de [X] protocolos assistenciais",
+    desp:"• Custeio operacional das UBS (energia, limpeza, conservação) — R$ [X]\n• Contratos de serviços médicos via licitação (Elem. 39) — R$ [X]\n• Materiais de consumo, insumos e medicamentos — R$ [X]\n• Capacitação das equipes de APS — R$ [X]",
+    cnes:"Informar CNES das unidades beneficiadas:\nEx: CNES [XXXXXXX] — [Nome da UBS] — Tipo: Unidade Básica de Saúde"}
+},
+MAC:{cap:"II",arts:"22 a 32",acao:"10.302.5118.2E90",gnd:"GND 3 — Custeio",modal:"31 e 41",
+  nome:"Incremento Temporário ao Custeio da Atenção Especializada — MAC",natureza:"CUSTEIO",
+  limite:"Teto MAC total (Portaria GM/MS 10.146/2026) + acréscimos FAEC, IVS e Amazônia Legal",parcelas:"Até 6 parcelas",
+  pode:[
+    {t:"Manutenção de unidades públicas municipais: hospital, UPA, policlínica, ambulatório",s:"Custeio para ampliar oferta e qualificar serviços especializados"},
+    {t:"Custeio de consultas especializadas, exames e cirurgias eletivas na rede própria",s:"Procedimentos de média e alta complexidade em unidades municipais"},
+    {t:"Contratualização com entidades SEM fins lucrativos com metas obrigatórias (filantrópicas, Santas Casas, APAEs)",s:"Contrato formal, CNES ativo, metas quantitativas ou qualitativas, cláusula de caráter temporário"},
+    {t:"Redução de filas de regulação via mutirões e ampliação de oferta",s:"Metas quantitativas de atendimentos devem ser estabelecidas"},
+    {t:"UMAE via AgSUS: Tipologia 1 Imagem R$ 721.498/30 dias | Tipologia 2 Saúde da Mulher R$ 660.542/30 dias",s:"CIR+CIB obrigatórios; indicar tipologia e municípios atendidos"},
+    {t:"Programa Agora Tem Especialistas — componentes ambulatorial e cirúrgico",s:"Procedimentos do programa nacional de redução de filas"},
+    {t:"Serviços ambulatoriais com contrato formal, CNES vinculado e metas mensais",s:"Pagamento por produção comprovada — relatório mensal obrigatório"}
+  ],
+  naopode:[
+    {t:"Salários, encargos ou vantagens remuneratórias — Art. 93",s:"Vedação absoluta para todas as emendas RP6"},
+    {t:"Equipamentos, veículos ou obras — GND 4 não autorizado nesta emenda",s:"Use proposta de Estruturação AE (Cap. IV, ação 8535)"},
+    {t:"Repasse direto a empresas lucrativas — Art. 98",s:"Empresa pode prestar serviço, mas não receber a emenda diretamente"},
+    {t:"Consórcio como beneficiário direto — Art. 27 §4º",s:"Fluxo: emenda→FMS→contrato→consórcio executa"},
+    {t:"Ultrapassar o Teto MAC (Portaria 10.146/2026)",s:"Verifique antes de cadastrar — ultrapassar gera impedimento técnico"},
+    {t:"Contratos sem metas quantitativas ou qualitativas — Art. 31",s:"Meta mensurável é obrigatória. Pagamento sem produção = glosa."},
+    {t:"Gerar obrigação financeira permanente — Art. 31",s:"Cláusula de caráter temporário obrigatória no contrato"},
+    {t:"Passagens comerciais",s:"Não previsto. Use recurso próprio para TFD."}
+  ],
+  checklist:[
+    {g:"Planejamento",items:[
+      {t:"Plano de Trabalho com os 5 elementos do Art. 7º",s:"Objeto, justificativa, metas, despesas e CNES",a:"Art. 7º"},
+      {t:"Teto MAC verificado na Portaria GM/MS 10.146/2026",s:"Valor deve ser ≤ teto disponível",a:"Art. 23"},
+      {t:"Plano publicado no site oficial do município",s:"Transparência ativa obrigatória para contratos MAC",a:"Art. 27 §5º"}
+    ]},
+    {g:"Aprovações",items:[
+      {t:"Deliberação da CIR aprovada",s:"Bloqueio automático sem CIR",a:"Art. 10"},
+      {t:"Resolução da CIB aprovada",s:"Condição obrigatória",a:"Art. 10"}
+    ]},
+    {g:"Contratos",items:[
+      {t:"Contrato com metas formalizadas (quant. ou qual.)",s:"Consultas, cirurgias, procedimentos ou indicadores",a:"Art. 31"},
+      {t:"Cláusula de caráter temporário incluída",s:"Vedada ampliação permanente",a:"Art. 31"},
+      {t:"CNES ativo do prestador informado",s:"Unidades sem CNES não são elegíveis",a:"Art. 24"}
+    ]},
+    {g:"Repasse a Entidade",items:[
+      {t:"Recurso repassado em até 30 dias da disponibilidade",s:"Atraso → notificação → suspensão → TCE",a:"Art. 103 II"},
+      {t:"Comprovante registrado no InvestSUS em 5 dias úteis",s:"Sem registro → notificação automática",a:"Art. 103 III"}
+    ]},
+    {g:"Sistemas",items:[
+      {t:"Conta específica no Transferegov.br",s:"Conta exclusiva da emenda",a:"Art. 12"},
+      {t:"Produção registrada no SIA/SUS e SIH",s:"Inconsistências = impedimento técnico",a:"Art. 100"},
+      {t:"InvestSUS Gestão atualizado",s:"Situação, % e data",a:"Art. 105"},
+      {t:"RAG com prestação ao Conselho",s:"Anual obrigatório",a:"Art. 97"}
+    ]}
+  ],
+  alertas:[
+    {tipo:"danger",titulo:"Metas OBRIGATÓRIAS no contrato — Art. 31",desc:"Todo contrato com filantrópica deve ter metas: <strong>quantitativas</strong> (nº consultas, cirurgias) ou <strong>qualitativas</strong> (protocolos, ambiência). Pagamento sem meta = irregular + glosa."},
+    {tipo:"danger",titulo:"Caráter temporário obrigatório — Art. 31",desc:"O contrato não pode gerar ampliação permanente do repasse. <strong>Cláusula impeditiva obrigatória.</strong> Ponto crítico de auditoria."},
+    {tipo:"danger",titulo:"Repasse à entidade: 30 dias — Art. 103 II",desc:"Após disponibilidade na conta: <strong>30 dias</strong> para repassar. Atraso → notificação (10 dias) → suspensão → devolução ao FNS → TCE."},
+    {tipo:"warning",titulo:"UMAE: CIR + CIB obrigatórios — Arts. 28-30",desc:"CIR deliberação + CIB homologação, especificando tipologia e municípios. Recurso vai à AgSUS, não ao município."},
+    {tipo:"warning",titulo:"Teto MAC — verificar antes de cadastrar",desc:"Consultar Portaria GM/MS 10.146/2026. Ultrapassar gera impedimento técnico automático."},
+    {tipo:"info",titulo:"Plano publicado no site — Art. 27 §5º",desc:"Obrigação frequentemente esquecida. Todos os planos MAC devem estar no site oficial."}
+  ],
+  topicos:{
+    terceirizacao:{n:"Terceirização de Serviços Médicos",i:"💉",s:"PERMITIDO COM CONDIÇÕES",
+      r:"Para MAC, a contratualização preferencial é com <strong>entidades sem fins lucrativos</strong> (Art. 27 II). Empresa lucrativa pode prestar via licitação (Elem. 39), mas não pode ser beneficiária direta. Metas são obrigatórias.",
+      tab:[{s:"Entidade sem fins lucrativos + metas",p:"SIM",o:"Art. 27 II — forma preferencial MAC"},{s:"Empresa lucrativa via licitação (Elem. 39)",p:"SIM",o:"Não recebe a emenda diretamente"},{s:"Repasse direto a empresa lucrativa",p:"NÃO",o:"Art. 98 — vedado"},{s:"Contrato sem metas",p:"NÃO",o:"Art. 31 — irregular"},{s:"Garantia de renovação permanente",p:"NÃO",o:"Art. 31 — temporário obrigatório"}]},
+    medicamentos:{n:"Medicamentos",i:"💊",s:"PERMITIDO COM CONDIÇÕES",r:"Medicamentos MAC/componente especializado são permitidos, desde que no plano e com licitação.",
+      tab:[{s:"Medicamentos MAC/componente especializado",p:"SIM",o:"Deve estar no plano"},{s:"Insumos para procedimentos especializados",p:"SIM",o:"Vinculados às metas"},{s:"Sem processo licitatório",p:"NÃO",o:"Lei 14.133/2021 obrigatória"}]},
+    passagens:{n:"Passagens",i:"✈️",s:"NÃO PREVISTO",r:"Passagem não prevista para nenhuma emenda RP6. UMAE é o serviço móvel disponível no MAC.",
+      tab:[{s:"Passagem com emenda MAC",p:"NÃO",o:"Não previsto na portaria"},{s:"Serviço via UMAE",p:"SIM",o:"Via AgSUS — não é passagem"}]},
+    consorcios:{n:"Consórcios",i:"🤝",s:"PERMITIDO COM RESTRIÇÕES",r:"Consórcio não pode ser beneficiário direto (Art. 27 §4º). Fluxo: emenda→FMS→contrato→consórcio executa.",
+      tab:[{s:"Consórcio via contrato com metas",p:"SIM",o:"Produção comprovada mensalmente"},{s:"Consórcio como beneficiário direto",p:"NÃO",o:"Art. 27 §4º — vedado"}]},
+    ambulatorial:{n:"Serviços Ambulatoriais",i:"🏨",s:"OBJETO CENTRAL DO MAC",r:"Serviços ambulatoriais especializados são o foco do MAC. Metas obrigatórias, CNES ativo, pagamento por produção.",
+      tab:[{s:"Consultas especializadas com CNES e metas",p:"SIM",o:"Objeto central"},{s:"Cirurgias eletivas com contrato",p:"SIM",o:"Metas quantitativas obrigatórias"},{s:"Exames MAC com registro no SIA",p:"SIM",o:"Produção no SIA/SIH"},{s:"Sem CNES ativo",p:"NÃO",o:"Condição indispensável"}]},
+    folha:{n:"Pagamento de Pessoal",i:"🚫",s:"VEDAÇÃO ABSOLUTA — Art. 93",r:"Vedação absoluta para todas as emendas RP6 sem exceção.",
+      tab:[{s:"Salários, encargos, gratificações",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Plantões como CPF",p:"NÃO",o:"Art. 93 — absoluto"},{s:"Contrato empresa CNPJ (Elem. 39)",p:"SIM",o:"Serviço de terceiros — não é folha"}]},
+    conta:{n:"Conta Bancária",i:"🏦",s:"OBRIGAÇÃO CRÍTICA",r:"Conta específica obrigatória. Prazo crítico: 30 dias para repassar à entidade; 5 dias úteis para registrar no InvestSUS.",
+      tab:[{s:"Conta específica Transferegov.br",p:"OBRIGATÓRIO",o:"Art. 12"},{s:"Prazo de repasse à entidade",p:"30 DIAS",o:"Art. 103 II — atraso gera TCE"},{s:"Registro InvestSUS após repasse",p:"5 DIAS ÚTEIS",o:"Art. 103 III"}]},
+    veiculos:{n:"Veículos",i:"🚑",s:"NÃO PERMITIDO — MAC é GND 3",r:"MAC é GND 3. Veículos são GND 4. Use proposta de Estruturação AE (Cap. IV).",
+      tab:[{s:"Veículo com emenda MAC",p:"NÃO",o:"MAC = GND 3"},{s:"UMAE (serviço móvel especializado)",p:"SIM",o:"Via AgSUS — não é veículo próprio"}]},
+    obras:{n:"Obras e Equipamentos",i:"🏗️",s:"NÃO PERMITIDO — MAC é GND 3",r:"MAC é GND 3. Use proposta de Estruturação AE (Cap. IV, ação 8535).",
+      tab:[{s:"Obras/equipamentos com emenda MAC",p:"NÃO",o:"MAC = GND 3. Obras/equip = GND 4."}]}
+  },
+  plano:{obj:"Incremento temporário ao custeio dos serviços de assistência hospitalar e ambulatorial — MAC, para manutenção, qualificação e ampliação da oferta de serviços de média e alta complexidade, por meio da manutenção de unidades próprias e/ou contratualização com entidades sem fins lucrativos, com cumprimento de metas assistenciais.",
+    just:"O município apresenta demanda reprimida por serviços especializados, com filas impactando o acesso. O incremento ao MAC visa ampliar a capacidade, reduzir filas de regulação e melhorar o acesso.",
+    mq:"• Realizar [X] consultas especializadas por mês\n• Executar [X] cirurgias no período\n• Reduzir fila de regulação em [X]%\n• Realizar [X] exames MAC por mês",
+    mqual:"• Protocolo de humanização implantado\n• Adequação da ambiência das unidades\n• Redução do tempo médio de procedimentos\n• Avaliação satisfação: meta [X]%",
+    desp:"• Manutenção de unidades públicas — R$ [X]\n• Serviços contratados com filantrópica — R$ [X]\n• Custeio de procedimentos especializados — R$ [X]",
+    cnes:"CNES da Secretaria ou estabelecimento especializado\nEx: CNES [XXXXXXX] — [Hospital/UPA/Policlínica]"}
+}
+};
+
+// Tipos de proposta para os cards
+const TIPOS=[
+  {id:'PAP',  icon:'🏥',n:'Incremento PAP — Atenção Primária',d:'Custeio das UBS, insumos, serviços APS, capacitações e vigilância',tags:['GND 3','Custeio','Cap. I'],tc:'badge-blue'},
+  {id:'MAC',  icon:'🏨',n:'Incremento MAC — Atenção Especializada',d:'Hospital, consultas especializadas, cirurgias, UMAE, filantrópicas',tags:['GND 3','Custeio','Cap. II'],tc:'badge-blue'},
+  {id:'INV_APS',icon:'🏗️',n:'Estruturação APS — Investimento',d:'Construção/reforma UBS, equipamentos, veículo de equipe, embarcações',tags:['GND 4','Investimento','Cap. III'],tc:'badge-green'},
+  {id:'INV_AE', icon:'🚑',n:'Estruturação Atenção Especializada',d:'Ambulância SAMU, UPA, CAPS, CER, hospital, equipamentos MAC',tags:['GND 4','Investimento','Cap. IV'],tc:'badge-green'},
+  {id:'TRANSPORTE',icon:'🚌',n:'Transporte Sanitário Eletivo',d:'Veículo coletivo para pacientes em procedimentos eletivos agendados',tags:['GND 4','Investimento','Cap. V'],tc:'badge-green'},
+  {id:'ARBOVIROSES',icon:'🦟',n:'Arboviroses — Dengue/Zika/Chikungunya',d:'Equipamentos vigilância, veículo entomológico exclusivo, custeio de ações',tags:['GND 3+4','Cap. VI'],tc:'badge-orange'},
+  {id:'ZOONOSES',icon:'🐕',n:'Vigilância de Zoonoses — UVZ',d:'Construção/reforma UVZ, equipamentos, materiais de consumo',tags:['GND 3+4','Cap. VII'],tc:'badge-orange'},
+  {id:'IMUNIZACAO',icon:'💉',n:'Imunização — Rede de Frio / PNI',d:'Rede de frio, vacimóvel, equipamentos, capacitação PNI, vacinação nas escolas',tags:['GND 3+4','Cap. VIII'],tc:'badge-orange'},
+  {id:'HIV_TB',icon:'🔬',n:'HIV/Aids, TB, Hepatites Virais, IST',d:'Equipamentos, veículos, obras e custeio para municípios prioritários',tags:['GND 3+4','Cap. XV'],tc:'badge-purple'},
+  {id:'MALARIA',icon:'🦠',n:'Malária — Vigilância e Controle',d:'Equipamentos, veículos terrestres/aquáticos, ações de controle e eliminação',tags:['GND 3+4','Cap. XVII'],tc:'badge-purple'},
+  {id:'BRASIL_SAUDAVEL',icon:'🌱',n:'Brasil Saudável — Eliminação 2030',d:'Eliminação de HIV, TB, doenças negligenciadas e hepatites até 2030',tags:['GND 3+4','Cap. XVI'],tc:'badge-purple'},
+  {id:'SAUDE_DIGITAL',icon:'💻',n:'Saúde Digital / Telessaúde',d:'Sistemas (domínio público), equipamentos TI, telessaúde, segurança',tags:['GND 3+4','Cap. IX'],tc:'badge-yellow'},
+  {id:'EDUCACAO',icon:'🎓',n:'Gestão do Trabalho / Educação em Saúde',d:'Capacitação profissionais SUS, residências, equipamentos gestão',tags:['GND 3+4','Cap. X'],tc:'badge-yellow'},
+  {id:'INDIGENA',icon:'🪶',n:'Saúde Indígena — SasiSUS',d:'Saúde e saneamento para povos indígenas (entes com população indígena)',tags:['GND 3+4','Cap. XIII'],tc:'badge-yellow'},
+  {id:'PAC',icon:'🏛️',n:'Novo PAC — Eixo Saúde',d:'Obras selecionadas: UBS, policlínica, maternidade, CAPS, SAMU, CER',tags:['GND 4','Investimento','Cap. XIV'],tc:'badge-green'}
+];
+
+// Mapeamento código → tipo
+const CODIGO_TIPO={'2E89':'PAP','2E90':'MAC','8581':'INV_APS','8535':'INV_AE','20YJ':'ARBOVIROSES','21CF':'SAUDE_DIGITAL','20YD':'EDUCACAO','20YP':'INDIGENA'};
+const EXEMPLOS_TIPO={
+  PAP:'Exemplo de proposta PAP / incremento APS',
+  MAC:'Exemplo de proposta MAC / assistência especializada',
+  INV_APS:'Exemplo de estruturação de UBS / APS',
+  INV_AE:'Exemplo de estruturação de UPA, hospital ou CAPS',
+  TRANSPORTE:'Exemplo de transporte sanitário eletivo',
+  ARBOVIROSES:'Exemplo de proposta para controle de arboviroses',
+  ZOONOSES:'Exemplo de proposta para unidade de zoonoses',
+  IMUNIZACAO:'Exemplo de rede de frio / vacinação',
+  HIV_TB:'Exemplo de enfrentamento HIV, TB e IST',
+  MALARIA:'Exemplo de vigilância e controle da malária',
+  BRASIL_SAUDAVEL:'Exemplo de ações do Brasil Saudável',
+  SAUDE_DIGITAL:'Exemplo de saúde digital e telessaúde',
+  EDUCACAO:'Exemplo de educação em saúde / gestão do trabalho',
+  INDIGENA:'Exemplo de saúde indígena',
+  PAC:'Exemplo de obra do Novo PAC - Saúde'
+};
+
+// Estado
+let ckTotal=0,ckDone=0,searchMode='auto';
+
+// ─── INICIALIZAÇÃO ──────────────────────────────────────────────────
+window.onload = function(){
+  const k = localStorage.getItem('pdt_key')||'';
+  if(k) document.getElementById('inApiKey').value=k;
+  const cont = document.getElementById('tipoCards');
+  TIPOS.forEach(t=>{
+    const d=document.createElement('div');
+    d.className='tipo-card'; d.id='tc_'+t.id;
+    d.onclick=()=>selecionarTipo(t.id);
+    d.innerHTML=`<div class="tipo-card-icon">${t.icon}</div>
+      <div><div class="tipo-card-name">${t.n}</div>
+      <div class="tipo-card-desc">${t.d}</div>
+      <div class="tipo-card-tags">${t.tags.map(tg=>`<span class="tipo-tag ${t.tc}">${tg}</span>`).join('')}</div></div>`;
+    cont.appendChild(d);
+  });
+  const quick=document.getElementById('quickExamples');
+  TIPOS.slice(0,8).forEach(t=>{
+    const b=document.createElement('button');
+    b.className='quick-pill';
+    b.type='button';
+    b.textContent=t.n.split('—')[0].trim();
+    b.onclick=()=>aplicarExemploTipo(t.id);
+    quick.appendChild(b);
+  });
+};
+
+function salvarChave(){
+  const k=document.getElementById('inApiKey').value.trim();
+  if(k.length>10) localStorage.setItem('pdt_key',k);
+}
+
+function setSearchMode(mode){
+  searchMode=mode;
+  document.getElementById('modeAuto').classList.toggle('active',mode==='auto');
+  document.getElementById('modeManualNum').classList.toggle('active',mode==='manual');
+  const btn=document.getElementById('btnBuscar');
+  const st=document.getElementById('fetchStatus');
+  if(mode==='manual'){
+    btn.disabled=true;
+    btn.style.opacity='.55';
+    st.className='fetch-status warn';
+    st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Preencha abaixo o município, o tipo, o valor, o autor e gere o relatório.';
+  }else{
+    btn.disabled=false;
+    btn.style.opacity='1';
+    st.className='fetch-status';
+    st.innerHTML='';
+  }
+}
+
+function limparBusca(){
+  ['inEmenda','inNome','inMunicipio','inValor','inAutor'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('inTipo').value='';
+  document.getElementById('fetchStatus').className='fetch-status';
+  document.getElementById('fetchStatus').innerHTML='';
+}
+
+function aplicarExemploTipo(tipo){
+  document.getElementById('inTipo').value=tipo;
+  document.getElementById('inNome').value=TIPOS.find(t=>t.id===tipo)?.n||'';
+  document.getElementById('inEmenda').value='';
+  document.getElementById('fetchStatus').className='fetch-status ok';
+  document.getElementById('fetchStatus').innerHTML='✅ Exemplo aplicado. Agora complete município, valor e autor, ou gere o relatório direto por tipo.';
+  switchTab('busca');
+}
+
+function detectarTipoInteligente(texto=''){
+  const t=(texto||'').toUpperCase();
+  for(const [k,tp] of Object.entries(CODIGO_TIPO)){if(t.includes(k)) return tp;}
+  if(/PAP|APS|ATENCAO PRIMARIA|ATENÇÃO PRIMÁRIA|UBS|ESF|ACS/.test(t)) return 'PAP';
+  if(/MAC|ATENCAO ESPECIALIZADA|ATENÇÃO ESPECIALIZADA|HOSPITAL|POLICLINICA|POLICLÍNICA|CONSULTA ESPECIALIZADA/.test(t)) return 'MAC';
+  if(/SAMU|UPA|CAPS|CER|AMBULANCIA|AMBULÂNCIA/.test(t)) return 'INV_AE';
+  if(/ESTRUTURACAO APS|ESTRUTURAÇÃO APS|CONSTRUCAO UBS|CONSTRUÇÃO UBS|REFORMA UBS/.test(t)) return 'INV_APS';
+  if(/ARBOVIROSE|DENGUE|ZIKA|CHIKUNGUNYA/.test(t)) return 'ARBOVIROSES';
+  if(/ZOONOSE/.test(t)) return 'ZOONOSES';
+  if(/VACINA|IMUNIZACAO|IMUNIZAÇÃO|REDE DE FRIO/.test(t)) return 'IMUNIZACAO';
+  if(/HIV|TUBERCULOSE|HEPATITE|IST/.test(t)) return 'HIV_TB';
+  if(/MALARIA|MALÁRIA/.test(t)) return 'MALARIA';
+  if(/DIGITAL|TELESSAUDE|TELESSAÚDE/.test(t)) return 'SAUDE_DIGITAL';
+  if(/EDUCACAO|EDUCAÇÃO|CAPACITACAO|CAPACITAÇÃO|RESIDENCIA|RESIDÊNCIA/.test(t)) return 'EDUCACAO';
+  if(/INDIGENA|INDÍGENA|SASISUS/.test(t)) return 'INDIGENA';
+  if(/TRANSPORTE SANITARIO|TRANSPORTE SANITÁRIO/.test(t)) return 'TRANSPORTE';
+  if(/PAC/.test(t)) return 'PAC';
+  return '';
+}
+
+function switchTab(t){
+  document.getElementById('tabBusca').style.display=t==='busca'?'block':'none';
+  document.getElementById('tabTipo').style.display=t==='tipo'?'block':'none';
+  document.getElementById('tbBusca').className='tab-btn'+(t==='busca'?' active':'');
+  document.getElementById('tbTipo').className='tab-btn'+(t==='tipo'?' active':'');
+}
+
+function selecionarTipo(tipo){
+  document.querySelectorAll('.tipo-card').forEach(c=>c.classList.remove('selected'));
+  const card=document.getElementById('tc_'+tipo);
+  if(card){card.classList.add('selected');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  document.getElementById('inTipo').value=tipo;
+  document.getElementById('inEmenda').value='';
+  document.getElementById('inMunicipio').value='';
+  document.getElementById('inValor').value='';
+  document.getElementById('inAutor').value='';
+  document.getElementById('inNome').value=TIPOS.find(t=>t.id===tipo)?.n||EXEMPLOS_TIPO[tipo]||'';
+  analisar();
+}
+
+function onEmendaInput(){
+  const v=document.getElementById('inEmenda').value.trim().toUpperCase();
+  const tipo=detectarTipoInteligente(v);
+  if(tipo) document.getElementById('inTipo').value=tipo;
+}
+
+// ─── BUSCA NO PORTAL DA TRANSPARÊNCIA ──────────────────────────────
+async function buscarEmenda(){
+  const apiBase=(document.getElementById('inApiKey').value.trim()||'http://127.0.0.1:8000').replace(/\/$/, '');
+  const codigo=document.getElementById('inEmenda').value.trim();
+  const st=document.getElementById('fetchStatus');
+  if(searchMode==='manual'){
+    st.className='fetch-status warn';
+    st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Complete os campos abaixo e gere o relatório.';
+    return;
+  }
+  if(!codigo){alert('Informe o número da emenda ou da proposta.');return;}
+
+  st.className='fetch-status loading';
+  st.innerHTML='<div class="mini-spin"></div> Consultando API local...';
+  document.getElementById('btnBuscar').disabled=true;
+
+  try{
+    const res=await fetch(`${apiBase}/api/buscar?numero=${encodeURIComponent(codigo)}`);
+    if(!res.ok){
+      let msg='Não foi possível concluir a busca.';
+      try{ const err=await res.json(); msg=err.detail||msg; }catch(_e){}
+      throw new Error(msg);
+    }
+    const data=await res.json();
+
+    if(data.municipio) document.getElementById('inMunicipio').value=data.municipio+(data.uf?(' - '+data.uf):'');
+    if(data.valor_formatado) document.getElementById('inValor').value=data.valor_formatado;
+    else if(data.valor) document.getElementById('inValor').value='R$ '+Number(data.valor).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    if(data.autor) document.getElementById('inAutor').value=data.autor;
+    if(data.objeto) document.getElementById('inNome').value=data.objeto;
+    if(data.tipo) document.getElementById('inTipo').value=data.tipo;
+
+    const obs=(data.observacoes||[]).slice(0,3).join(' | ');
+    const badge=data.status==='ok'?'✅':(data.status==='parcial'?'⚠️':'ℹ️');
+    st.className='fetch-status '+(data.status==='ok'?'ok':(data.status==='parcial'?'warn':'warn'));
+    st.innerHTML=`${badge} <strong>Busca concluída.</strong> Fonte: <strong>${data.fonte||'local'}</strong>. ${data.tipo_label?('Tipo sugerido: <strong>'+data.tipo_label+'</strong>. '):''}${data.confianca!==undefined?('Confiança: <strong>'+data.confianca+'%</strong>. '):''}${obs?('<br>'+obs):''}`;
+  }catch(e){
+    st.className='fetch-status err';
+    st.innerHTML='❌ <strong>Falha ao consultar a API local.</strong> '+e.message+'<br>Confira se o backend está rodando em <strong>'+apiBase+'</strong>.';
+  }
+  document.getElementById('btnBuscar').disabled=false;
+}
+
+// ─── GERAR RELATÓRIO ──────────────────────────────────────────────
+async function analisar(){
+  const emenda=document.getElementById('inEmenda').value.trim()||'—';
+  const municipio=document.getElementById('inMunicipio').value.trim();
+  const tipo=document.getElementById('inTipo').value;
+  const valor=document.getElementById('inValor').value.trim();
+  const autor=document.getElementById('inAutor').value.trim();
+  const nome=document.getElementById('inNome').value.trim();
+  if(!tipo){alert('Selecione o tipo da proposta.');return;}
+
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('report').className='report';
+  document.getElementById('loading').className='loading show';
+  document.getElementById('loadTitle').textContent='Gerando relatório...';
+  document.getElementById('loadSub').textContent='Consultando base de regras da Portaria 10.297/2026';
+  document.getElementById('btnAnalisar').disabled=true;
+  document.getElementById('sideResult').className='side-result';
+  ckTotal=0; ckDone=0;
+
+  const steps=['s1','s2','s3','s4','s5'];
+  const labels=['Buscando base de conhecimento','Identificando capítulo e regras','Mapeando pode / não pode','Gerando checklist de auditoria','Montando relatório completo'];
+  const delays=[300,250,400,500,300];
+  for(let i=0;i<5;i++){
+    if(i>0){const p=document.getElementById(steps[i-1]);p.className='step done';p.querySelector('.step-dot').style.animation='none';}
+    const el=document.getElementById(steps[i]); el.className='step active';
+    document.getElementById(steps[i]+'t').textContent=labels[i];
+    await sleep(delays[i]);
+  }
+  document.getElementById('s5').className='step done';
+
+  const dados=BASE[tipo]||getGenerico(tipo);
+  renderReport(dados,emenda,municipio,valor,autor,nome);
+  document.getElementById('rcContent').innerHTML=`
+    <div class="rc-row"><span class="rc-key">Emenda</span><span class="rc-val" style="font-size:8pt">${emenda}</span></div>
+    <div class="rc-row"><span class="rc-key">Município</span><span class="rc-val">${municipio||'—'}</span></div>
+    <div class="rc-row"><span class="rc-key">Valor</span><span class="rc-val green">${valor||'A confirmar'}</span></div>
+    ${autor?`<div class="rc-row"><span class="rc-key">Autor</span><span class="rc-val">${autor}</span></div>`:''}
+    <div class="rc-row"><span class="rc-key">Natureza</span><span class="rc-val blue">${dados.natureza}</span></div>
+    <div class="rc-row"><span class="rc-key">Cap./Arts.</span><span class="rc-val">Cap. ${dados.cap} · Arts. ${dados.arts}</span></div>`;
+  document.getElementById('sideResult').className='side-result show';
+  document.getElementById('loading').className='loading';
+  document.getElementById('report').className='report show';
+  document.getElementById('btnAnalisar').disabled=false;
+}
+
+function getGenerico(tipo){
+  const m={INV_APS:{n:"Estruturação APS",c:"III",a:"33 e 34",ac:"10.301.5119.8581",g:"GND 4 — Investimento",mod:"31 e 41",nat:"INVESTIMENTO",lim:"SIGEM/RENEM",parc:"Conforme programação"},
+    INV_AE:{n:"Estruturação Atenção Especializada",c:"IV",a:"35 a 38",ac:"10.302.5118.8535",g:"GND 4 — Investimento",mod:"31 ou 41",nat:"INVESTIMENTO",lim:"SIGEM/RENEM",parc:"Conforme programação"},
+    TRANSPORTE:{n:"Transporte Sanitário Eletivo",c:"V",a:"39 a 45",ac:"8581 ou 8535",g:"GND 4 — Investimento",mod:"31 ou 41",nat:"INVESTIMENTO",lim:"Projeto técnico CIB",parc:"Conforme programação"},
+    ARBOVIROSES:{n:"Vigilância de Arboviroses",c:"VI",a:"46 a 48",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"31, 41, 50 ou 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Até 3x Piso Fixo Vigilância (≤50 mil hab.)",parc:"Conforme programação"},
+    ZOONOSES:{n:"Vigilância de Zoonoses — UVZ",c:"VII",a:"49 a 54",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"30, 31, 41 ou 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Conforme proposta",parc:"Conforme programação"},
+    IMUNIZACAO:{n:"Imunização — Rede de Frio",c:"VIII",a:"55 a 60",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"31 ou 41",nat:"CUSTEIO + INVESTIMENTO",lim:"Conforme proposta",parc:"Conforme programação"},
+    HIV_TB:{n:"HIV/Aids, TB, Hepatites, IST",c:"XV",a:"86",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"31, 41, 50 e 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Até 3x Piso Fixo Vigilância (≤50 mil hab.)",parc:"Conforme programação"},
+    MALARIA:{n:"Malária",c:"XVII",a:"90 e 91",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"31, 41 ou 50",nat:"CUSTEIO + INVESTIMENTO",lim:"Até 3x Piso Fixo Vigilância",parc:"Conforme programação"},
+    BRASIL_SAUDAVEL:{n:"Brasil Saudável — Eliminação 2030",c:"XVI",a:"87 a 89",ac:"10.305.5123.20YJ",g:"GND 3 e 4",mod:"31, 41, 50 e 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Até 3x Piso Fixo Vigilância",parc:"Conforme programação"},
+    SAUDE_DIGITAL:{n:"Saúde Digital / Telessaúde",c:"IX",a:"61 a 64",ac:"10.573.5121.21CF ou 10.126.5121.21GM",g:"GND 3 e 4",mod:"31, 41, 50 ou 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Conforme proposta",parc:"Conforme programação"},
+    EDUCACAO:{n:"Gestão do Trabalho / Educação em Saúde",c:"X",a:"65 a 67",ac:"10.128.5121.20YD",g:"GND 3 e 4",mod:"31, 41, 50 ou 90",nat:"CUSTEIO + INVESTIMENTO",lim:"Conforme proposta",parc:"Conforme programação"},
+    INDIGENA:{n:"Saúde Indígena — SasiSUS",c:"XIII",a:"78 a 80",ac:"10.423.5122.20YP",g:"GND 3 e 4",mod:"90",nat:"CUSTEIO + INVESTIMENTO",lim:"Conforme proposta",parc:"Conforme programação"},
+    PAC:{n:"Novo PAC — Eixo Saúde",c:"XIV",a:"81 a 85",ac:"Conforme empreendimento",g:"GND 4 — Investimento",mod:"Conforme PAC",nat:"INVESTIMENTO",lim:"Seleção no PAC",parc:"Conforme programação"}
+  }[tipo]||{n:"Emenda RP6",c:"—",a:"—",ac:"—",g:"—",mod:"—",nat:"VERIFICAR",lim:"—",parc:"—"};
+  return{cap:m.c,arts:m.a,acao:m.ac,gnd:m.g,modal:m.mod,nome:m.n,natureza:m.nat,limite:m.lim,parcelas:m.parc,
+    pode:[{t:"Ações previstas no capítulo específico da portaria",s:"Consulte o Cap. "+m.c+" da Portaria GM/MS 10.297/2026"},{t:"Custeio e/ou investimento conforme GND autorizado",s:"GND 3=custeio; GND 4=investimento"},{t:"Ações com metas vinculadas ao Plano Municipal de Saúde",s:"Compatibilidade com PAS obrigatória — Art. 6º"}],
+    naopode:[{t:"Pagamento de pessoal (salários, encargos) — Art. 93",s:"Vedação absoluta para todas as emendas RP6"},{t:"Repasse direto a empresa lucrativa — Art. 98",s:"Empresa pode prestar serviço, não receber a emenda"},{t:"Gastos fora do objeto e capítulo desta emenda",s:"A portaria é taxativa"}],
+    checklist:[{g:"Obrigações Gerais",items:[{t:"Plano de Trabalho com 5 elementos do Art. 7º",s:"Objeto, justificativa, metas, despesas e CNES",a:"Art. 7º"},{t:"CIR + CIB aprovadas",s:"Obrigatório",a:"Art. 10"},{t:"Conta específica no Transferegov.br",s:"Exclusiva da emenda",a:"Art. 12"},{t:"InvestSUS Gestão atualizado",s:"Status, %, data",a:"Art. 105"},{t:"RAG ao Conselho",s:"Anual",a:"Art. 97"}]}],
+    alertas:[{tipo:"info",titulo:"Verifique o Capítulo "+m.c+" da Portaria",desc:"Regras detalhadas nos Arts. "+m.a+" da Portaria GM/MS 10.297/2026."},{tipo:"danger",titulo:"Vedação Absoluta — Pessoal (Art. 93)",desc:"Proibido para todas as emendas sem exceção."},{tipo:"warning",titulo:"Conta específica obrigatória — Art. 12",desc:"Conta exclusiva no Transferegov.br vinculada ao FMS."}],
+    topicos:{terceirizacao:{n:"Terceirização",i:"💉",s:"VERIFICAR",r:"Verifique as regras do Cap. "+m.c+". Elemento 39 (CNPJ/licitação) = geralmente permitido. Elemento 31 (CPF/folha) = vedado.",tab:[{s:"Contrato CNPJ via licitação (Elem. 39)",p:"SIM",o:"Não é folha"},{s:"Pagamento CPF (Elem. 31)",p:"NÃO",o:"Art. 93 — vedado"}]},medicamentos:{n:"Medicamentos",i:"💊",s:"VERIFICAR",r:"Depende do objeto desta emenda. Verificar se medicamentos estão previstos.",tab:[{s:"Sem licitação",p:"NÃO",o:"Lei 14.133/2021"}]},passagens:{n:"Passagens",i:"✈️",s:"NÃO PREVISTO",r:"Passagem não prevista para nenhuma emenda RP6.",tab:[{s:"Passagem comercial",p:"NÃO",o:"Não previsto na portaria"}]},consorcios:{n:"Consórcios",i:"🤝",s:"COM RESTRIÇÕES",r:"Consórcio não pode ser beneficiário direto em nenhum capítulo.",tab:[{s:"Consórcio via contrato",p:"SIM",o:"FMS→contrato→consórcio"},{s:"Direto",p:"NÃO",o:"Vedado"}]},ambulatorial:{n:"Ambulatorial",i:"🏨",s:"VERIFICAR",r:"Depende do capítulo.",tab:[{s:"Vinculado ao objeto",p:"VERIFICAR",o:"Depende do cap."}]},folha:{n:"Folha de Pessoal",i:"🚫",s:"VEDAÇÃO ABSOLUTA",r:"Vedado para todas as emendas.",tab:[{s:"Qualquer pagamento pessoal",p:"NÃO",o:"Art. 93 — absoluto"}]},conta:{n:"Conta Bancária",i:"🏦",s:"OBRIGATÓRIO",r:"Conta específica obrigatória.",tab:[{s:"Conta Transferegov.br",p:"OBRIGATÓRIO",o:"Art. 12"}]},veiculos:{n:"Veículos",i:"🚑",s:"VERIFICAR",r:"Depende do GND autorizado.",tab:[{s:"GND 4 autorizado",p:"SIM",o:"Caps. III, IV ou V"},{s:"GND 3 (custeio)",p:"NÃO",o:"Custeio não cobre veículo"}]},obras:{n:"Obras/Equipamentos",i:"🏗️",s:"VERIFICAR",r:"Depende do GND.",tab:[{s:"GND 4",p:"SIM",o:"Se autorizado"},{s:"GND 3",p:"NÃO",o:"GND 3 é custeio"}]}},
+    plano:{obj:"[Descrever objeto conforme Cap. "+m.c+" — "+m.n+"]",just:"[Justificar a necessidade local]",mq:"• [Meta quantitativa 1]\n• [Meta quantitativa 2]",mqual:"• [Meta qualitativa 1]",desp:"• [Despesa 1] — R$ [X]",cnes:"CNES do estabelecimento beneficiado"}};
+}
+
+function renderReport(d,emenda,municipio,valor,autor,nome){
+  let html=`<div class="rpt-header">
+    <div class="rpt-id">Emenda: ${emenda}${autor?' · Autor: '+autor:''} · ${new Date().toLocaleDateString('pt-BR')} · Portaria GM/MS nº 10.297/2026</div>
+    <div class="rpt-title">${nome||d.nome}</div>
+    <div class="rpt-grid">
+      <div class="rpt-item"><div class="rpt-label">Município</div><div class="rpt-value">${municipio||'—'}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Valor</div><div class="rpt-value big">${valor||'A confirmar'}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Natureza</div><div class="rpt-value">${d.natureza}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Capítulo / Artigos</div><div class="rpt-value">Cap. ${d.cap} · Arts. ${d.arts}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Ação Orçamentária</div><div class="rpt-value" style="font-size:8pt;font-family:monospace">${d.acao}</div></div>
+      <div class="rpt-item"><div class="rpt-label">GND</div><div class="rpt-value">${d.gnd}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Limite Financeiro</div><div class="rpt-value" style="font-size:8pt">${d.limite}</div></div>
+      <div class="rpt-item"><div class="rpt-label">Parcelas</div><div class="rpt-value">${d.parcelas}</div></div>
+    </div></div>`;
+
+  // PODE/NÃO PODE
+  html+=sec('📋','O que PODE e NÃO PODE gastar com esta emenda',`<div class="rules-grid">
+    <div><div class="rules-head ok">✔ PODE GASTAR — ${d.pode.length} itens</div>
+      ${d.pode.map(r=>`<div class="rule ok"><span class="rule-ic">✔</span><div><div>${r.t}</div>${r.s?`<div class="rule-sub">${r.s}</div>`:''}</div></div>`).join('')}
+    </div>
+    <div><div class="rules-head nok">✘ NÃO PODE GASTAR — ${d.naopode.length} itens</div>
+      ${d.naopode.map(r=>`<div class="rule nok"><span class="rule-ic">✘</span><div><div>${r.t}</div>${r.s?`<div class="rule-sub">${r.s}</div>`:''}</div></div>`).join('')}
+    </div></div>`,true,[`<span class="badge badge-green">${d.pode.length} permitidos</span>`,`<span class="badge badge-red">${d.naopode.length} vedados</span>`]);
+
+  // TÓPICOS
+  const tops=Object.entries(d.topicos||{});
+  html+=`<div class="sec"><div class="sec-head" onclick="toggleSec(this)"><div class="sec-icon">🔍</div>
+    <div class="sec-title">Casos Especiais Detalhados — Terceirização, Medicamentos, Passagens, Consórcios e mais</div>
+    <div class="sec-badges"><span class="badge badge-blue">${tops.length} tópicos</span></div>
+    <div class="sec-chevron">▼</div></div><div class="sec-body">
+    ${tops.map(([k,t])=>{
+      const bc=t.s&&(t.s.includes('NÃO')||t.s.includes('VEDAÇÃO'))?'badge-red':t.s&&(t.s.includes('PERMITIDO COM')||t.s.includes('OBRIGATÓRIO')||t.s.includes('VERIFICAR'))?'badge-orange':'badge-green';
+      return `<div class="topic"><div class="topic-head"><div class="topic-icon">${t.i}</div><div class="topic-name">${t.n}</div>
+        <span class="badge ${bc}" style="margin-left:auto">${t.s}</span></div>
+        <div class="topic-body"><p>${t.r}</p>
+        ${t.fok?`<div style="margin:6px 0"><strong style="font-size:8pt;color:var(--green)">✔ Fluxo correto:</strong><div class="flow-row"><div class="fbox green">${t.fok}</div></div></div>`:''}
+        ${t.fnok?`<div style="margin:6px 0"><strong style="font-size:8pt;color:var(--red)">✘ Fluxo errado:</strong><div class="flow-row"><div class="fbox red">${t.fnok}</div></div></div>`:''}
+        ${t.tab&&t.tab.length?`<table class="mini-table"><tr><th>Situação</th><th>Pode?</th><th>Observação</th></tr>
+        ${t.tab.map(r=>`<tr><td>${r.s}</td><td class="${r.p==='SIM'?'ok-cell':r.p==='NÃO'?'nok-cell':'warn-cell'}">${r.p==='SIM'?'✔ SIM':r.p==='NÃO'?'✘ NÃO':'⚠ '+r.p}</td><td>${r.o}</td></tr>`).join('')}
+        </table>`:''}
+        </div></div>`;
+    }).join('')}
+    </div></div>`;
+
+  // CHECKLIST
+  const allItems=d.checklist.reduce((a,g)=>a+(g.items||[]).length,0);
+  ckTotal=allItems;
+  html+=`<div class="sec"><div class="sec-head" onclick="toggleSec(this)"><div class="sec-icon">✅</div>
+    <div class="sec-title">Checklist de Auditoria — Antes de Empenhar</div>
+    <div class="sec-badges"><span class="badge badge-blue" id="clbadge">${allItems} itens</span></div>
+    <div class="sec-chevron">▼</div></div><div class="sec-body">
+    <div class="cl-pct" id="clpct">0 de ${allItems} itens — 0%</div>
+    <div class="cl-progress"><div class="cl-bar" id="clbar" style="width:0%"></div></div>
+    ${d.checklist.map(g=>`<div class="cl-group"><div class="cl-group-title">${g.g||g.grupo}</div>
+    ${(g.items||[]).map((item,i)=>{
+      const id=`cl_${ (g.g||g.grupo||'g').replace(/\W/g,'') }_${i}`;
+      return `<div class="cl-item" id="${id}" onclick="toggleCL('${id}')">
+        <div class="cl-box" id="b${id}"></div>
+        <div><div class="cl-main">${item.t||item.texto}</div>
+        <div class="cl-sub">${item.s||item.sub}</div>
+        <div class="cl-art">${item.a||item.art}</div></div></div>`;
+    }).join('')}</div>`).join('')}
+    </div></div>`;
+
+  // ALERTAS
+  html+=sec('⚠️','Alertas de Risco — O que o Auditor Vai Verificar',
+    d.alertas.map(a=>`<div class="alert ${a.tipo}"><div class="alert-emoji">${a.tipo==='danger'?'🚨':a.tipo==='warning'?'⚠️':'ℹ️'}</div>
+      <div><div class="alert-title">${a.titulo}</div><div class="alert-desc">${a.desc}</div></div></div>`).join(''),
+    false,[`<span class="badge badge-red">${d.alertas.filter(a=>a.tipo==='danger').length} críticos</span>`]);
+
+  // CONSEQUÊNCIAS
+  html+=sec('💣','Consequências do Descumprimento',`<div class="conseq-grid">
+    <div class="conseq-item"><div class="conseq-icon">⛔</div><div class="conseq-title">Impedimento Técnico</div>
+      <div class="conseq-desc">Bloqueia execução da emenda. Erros no plano, produção incorreta no SIA/SIH ou descumprimento técnico — Art. 11.</div></div>
+    <div class="conseq-item"><div class="conseq-icon">🔒</div><div class="conseq-title">Suspensão de Transferências</div>
+      <div class="conseq-desc">Art. 103 §2º — omissão nos prazos: suspensão automática + alerta a CGU, TCE e controle interno.</div></div>
+    <div class="conseq-item"><div class="conseq-icon">💸</div><div class="conseq-title">Devolução ao FNS</div>
+      <div class="conseq-desc">Art. 103 §3º — após prazo de notificação: devolução imediata ao FNS corrigida e atualizada.</div></div>
+    <div class="conseq-item"><div class="conseq-icon">⚖️</div><div class="conseq-title">Tomada de Contas Especial</div>
+      <div class="conseq-desc">Art. 103 §4º — não devolveu: TCE instaurada imediatamente contra o ente e o gestor responsável.</div></div>
+    </div>`,false,[`<span class="badge badge-red">Responsabilidade do gestor</span>`]);
+
+  // PLANO
+  const p=d.plano;
+  html+=sec('📄','Modelo de Plano de Trabalho — Art. 7º da Portaria',`
+    <div class="info-box">📝 Campos com fundo azul devem ser <strong>personalizados</strong> com dados reais do município. Atende integralmente ao Art. 7º da Portaria GM/MS nº 10.297/2026.</div>
+    <div class="plano-field"><div class="plano-label">1. Objeto</div><div class="plano-text">${p.obj}</div></div>
+    <div class="plano-field"><div class="plano-label">2. Justificativa</div><div class="plano-text">${p.just}</div></div>
+    <div class="plano-field"><div class="plano-label">3. Metas Quantitativas</div><div class="plano-text editable">${p.mq}</div></div>
+    <div class="plano-field"><div class="plano-label">4. Metas Qualitativas</div><div class="plano-text editable">${p.mqual}</div></div>
+    <div class="plano-field"><div class="plano-label">5. Aplicação das Despesas</div><div class="plano-text editable">${p.desp}</div></div>
+    <div class="plano-field"><div class="plano-label">6. CNES do Estabelecimento</div><div class="plano-text editable">${p.cnes}</div></div>
+    <button class="btn-copy" onclick="copiarPlano()">📋 Copiar modelo completo</button>
+    `,false,[`<span class="badge badge-blue">Pronto para adaptar</span>`]);
+
+  html+=`<div class="footer-note">Portaria GM/MS nº 10.297/2026 · ${new Date().toLocaleDateString('pt-BR')} · Não substitui assessoria jurídica especializada</div>`;
+  document.getElementById('report').innerHTML=html;
+}
+
+function sec(icon,titulo,corpo,open=false,badges=[]){
+  return`<div class="sec"><div class="sec-head" onclick="toggleSec(this)">
+    <div class="sec-icon">${icon}</div><div class="sec-title">${titulo}</div>
+    <div class="sec-badges">${badges.join('')}</div>
+    <div class="sec-chevron ${open?'open':''}">▼</div></div>
+    <div class="sec-body ${open?'open':''}">${corpo}</div></div>`;
+}
+function toggleSec(h){h.nextElementSibling.classList.toggle('open');h.querySelector('.sec-chevron').classList.toggle('open');}
+
+function toggleCL(id){
+  const el=document.getElementById(id),box=document.getElementById('b'+id);
+  const was=el.classList.contains('done');
+  el.classList.toggle('done');
+  if(!was){box.textContent='✓';ckDone++;}else{box.textContent='';ckDone--;}
+  if(ckDone<0)ckDone=0;
+  const pct=ckTotal>0?Math.round(ckDone/ckTotal*100):0;
+  document.getElementById('clpct').textContent=`${ckDone} de ${ckTotal} — ${pct}%`;
+  document.getElementById('clbar').style.width=pct+'%';
+  document.getElementById('clbadge').textContent=`${ckDone}/${ckTotal}`;
+}
+
+function copiarPlano(){
+  const rep=document.getElementById('report');
+  const labels=rep.querySelectorAll('.plano-label');
+  const texts=rep.querySelectorAll('.plano-text');
+  let txt='PLANO DE TRABALHO\nPortaria GM/MS nº 10.297/2026 — Art. 7º\n\n';
+  labels.forEach((l,i)=>{if(texts[i])txt+=l.textContent.trim()+'\n'+texts[i].textContent.trim()+'\n\n';});
+  navigator.clipboard.writeText(txt).then(()=>alert('✅ Plano copiado! Cole em qualquer editor.'));
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>
