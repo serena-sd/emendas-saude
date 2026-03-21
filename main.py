@@ -116,9 +116,8 @@ def debug(numero: str):
     try:
         driver = criar_driver()
         urls_fns = [
-            f"https://consultafns.saude.gov.br/#/proposta/{numero}",
             f"https://investsuspaineis.saude.gov.br/extensions/CGIN_InvestsusPaineis/CGIN_InvestsusPaineis.html#/proposta/{numero}",
-            f"https://infoms.saude.gov.br/extensions/TransferenciaFundoaFundo/TransferenciaFundoaFundo.html#/proposta/{numero}",
+            f"https://consultafns.saude.gov.br/#/consulta-proposta?numero={numero}",
         ]
         driver.get(urls_fns[0])
         WebDriverWait(driver,30).until(EC.presence_of_element_located((By.TAG_NAME,"body")))
@@ -150,9 +149,9 @@ def consultar(numero: str):
         driver = criar_driver()
         # Tenta múltiplas URLs — o FNS mudou de endereço
         urls_fns = [
-            f"https://consultafns.saude.gov.br/#/proposta/{numero}",
             f"https://investsuspaineis.saude.gov.br/extensions/CGIN_InvestsusPaineis/CGIN_InvestsusPaineis.html#/proposta/{numero}",
-            f"https://infoms.saude.gov.br/extensions/TransferenciaFundoaFundo/TransferenciaFundoaFundo.html#/proposta/{numero}",
+            f"https://consultafns.saude.gov.br/#/consulta-proposta?numero={numero}",
+            f"https://consultafns.saude.gov.br/#/proposta-detalhe/{numero}",
         ]
         url = urls_fns[0]
         driver.get(url)
