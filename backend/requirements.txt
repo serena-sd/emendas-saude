@@ -1,4 +1,0 @@
-fastapi
-uvicorn[standard]
-selenium==4.18.1
-webdriver-manager==4.0.1
