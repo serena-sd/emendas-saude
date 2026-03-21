@@ -1,31 +1,41 @@
 from fastapi import FastAPI
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+import time
 
 app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"status": "API rodando"}
+    return {"status": "API profissional rodando"}
 
 @app.get("/proposta/{numero}")
 def buscar_proposta(numero: str):
     try:
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+
+        driver = webdriver.Chrome(options=options)
+
         url = f"https://consultafns.saude.gov.br/#/proposta/{numero}/detalhe"
+        driver.get(url)
 
-        response = requests.get(url)
+        time.sleep(5)  # aguarda carregar
 
-        if response.status_code != 200:
-            return {"erro": "Não conseguiu acessar o site"}
+        dados = {}
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        try:
+            dados["proposta"] = numero
+            dados["titulo"] = driver.find_element(By.TAG_NAME, "body").text[:500]
+        except:
+            dados["erro"] = "Não conseguiu capturar dados"
 
-        texto = soup.get_text()
+        driver.quit()
 
-        return {
-            "numero_proposta": numero,
-            "dados_brutos": texto[:2000]  # só pra testar
-        }
+        return dados
 
     except Exception as e:
         return {"erro": str(e)}
