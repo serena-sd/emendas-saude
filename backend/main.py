@@ -1,19 +1,8 @@
-
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
 
 app = FastAPI()
-
-# Permitir acesso do frontend (GitHub Pages)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 API_KEY = os.getenv("API_KEY")
 
@@ -23,7 +12,7 @@ def home():
 
 @app.get("/emenda/{numero}")
 def buscar_emenda(numero: str):
-    url = f"https://api.portaldatransparencia.gov.br/api-de-dados/emendas?codigoEmenda={numero}"
+    url = f"https://api.portaldatransparencia.gov.br/api-de-dados/emendas?numeroEmenda={numero}"
 
     headers = {
         "chave-api-dados": API_KEY
@@ -32,6 +21,6 @@ def buscar_emenda(numero: str):
     response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
-        return {"erro": "Falha ao buscar dados"}
+        return {"erro": "Erro ao buscar dados", "status": response.status_code}
 
     return response.json()
