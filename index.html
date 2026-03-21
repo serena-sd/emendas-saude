@@ -712,7 +712,7 @@ async function buscarEmenda(){
   if(!codigo){ alert('Informe o número da emenda ou proposta.'); return; }
 
   // Avisa se o Worker ainda não foi configurado
-  if(WORKER_URL.includes('SEU-USUARIO')){
+  if(WORKER_URL.includes('https://emendas-proxy.samuel-duarte.workers.dev/')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
       +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
@@ -1830,7 +1830,7 @@ async function buscarEmenda(){
   if(!codigo){ alert('Informe o número da emenda ou proposta.'); return; }
 
   // Avisa se o Worker ainda não foi configurado
-  if(WORKER_URL.includes('SEU-USUARIO')){
+  if(WORKER_URL.includes('https://emendas-proxy.samuel-duarte.workers.dev/')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
       +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
