@@ -1,8 +1,5 @@
 from fastapi import FastAPI
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-import time
+import requests
 
 app = FastAPI()
 
@@ -10,32 +7,40 @@ app = FastAPI()
 def home():
     return {"status": "API profissional rodando"}
 
+
 @app.get("/proposta/{numero}")
 def buscar_proposta(numero: str):
+
+    url = "https://consultafns.saude.gov.br/recursos/proposta/consultar"
+
+    params = {
+        "ano": "2026",
+        "coEsfera": "3",
+        "coMunicipioIbge": "430545",  # CIDREIRA
+        "count": "10",
+        "nuProposta": numero
+    }
+
+    response = requests.get(url, params=params)
+
+    if response.status_code != 200:
+        return {"erro": "Falha ao consultar FNS"}
+
+    data = response.json()
+
     try:
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+        item = data["resultado"]["itensPagina"][0]
 
-        driver = webdriver.Chrome(options=options)
+        return {
+            "numero_proposta": numero,
+            "tipo_proposta": item.get("coTipoProposta"),
+            "tipo_recurso": item.get("dsTipoRecurso"),
+            "valor": item.get("vlProposta"),
+            "valor_pago": item.get("vlPago"),
+            "processo": item.get("nuProcesso"),
+            "tem_pagamento": len(item.get("pagamentos", [])) > 0,
+            "processo_constituido": item.get("constituidoProcesso")
+        }
 
-        url = f"https://consultafns.saude.gov.br/#/proposta/{numero}/detalhe"
-        driver.get(url)
-
-        time.sleep(5)  # aguarda carregar
-
-        dados = {}
-
-        try:
-            dados["proposta"] = numero
-            dados["titulo"] = driver.find_element(By.TAG_NAME, "body").text[:500]
-        except:
-            dados["erro"] = "Não conseguiu capturar dados"
-
-        driver.quit()
-
-        return dados
-
-    except Exception as e:
-        return {"erro": str(e)}
+    except:
+        return {"erro": "Proposta não encontrada ou estrutura inesperada"}
