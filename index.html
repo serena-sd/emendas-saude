@@ -697,9 +697,24 @@ function onEmendaInput(){
   if(tipo) document.getElementById('inTipo').value=tipo;
 }
 
-// ─── BUSCA NO PORTAL DA TRANSPARÊNCIA ──────────────────────────────
+// ─── ACORDAR O RENDER (plano free dorme após inatividade) ──────────
+async function acordarBackend(){
+  const st = document.getElementById('fetchStatus');
+  st.className='fetch-status loading';
+  st.innerHTML='<div class="mini-spin"></div> Aguardando o servidor acordar (pode levar até 40s na 1ª vez)...';
+  try{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 45000);
+    const res = await fetch(`${API_BASE}/health`, {signal: ctrl.signal});
+    clearTimeout(timer);
+    return res.ok;
+  }catch(e){
+    return false;
+  }
+}
+
+// ─── BUSCA COM WAKE-UP + TIMEOUT LONGO ─────────────────────────────
 async function buscarEmenda(){
-  const apiBase = API_BASE;
   const codigo = document.getElementById('inEmenda').value.trim();
   const st = document.getElementById('fetchStatus');
 
@@ -708,75 +723,96 @@ async function buscarEmenda(){
     st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Complete os campos abaixo e gere o relatório.';
     return;
   }
+  if(!codigo){ alert('Informe o número da proposta.'); return; }
 
-  if(!codigo){
-    alert('Informe o número da proposta.');
+  document.getElementById('btnBuscar').disabled = true;
+
+  // PASSO 1: acorda o servidor se necessário
+  st.className='fetch-status loading';
+  st.innerHTML='<div class="mini-spin"></div> <span id="stMsg">Verificando se o servidor está online...</span>';
+
+  const online = await acordarBackend();
+  if(!online){
+    st.className='fetch-status err';
+    st.innerHTML='❌ <strong>Servidor offline.</strong> O backend em <strong>' + API_BASE + '</strong> não respondeu. Verifique se o serviço está ativo no Render e tente novamente.';
+    document.getElementById('btnBuscar').disabled = false;
     return;
   }
 
+  // PASSO 2: busca a proposta (Selenium demora ~15s)
   st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Consultando proposta na API...';
-  document.getElementById('btnBuscar').disabled = true;
+  st.innerHTML='<div class="mini-spin"></div> Servidor online! Buscando proposta nº <strong>' + codigo + '</strong> (aguarde ~20 segundos)...';
 
   try{
-    const res = await fetch(`${apiBase}/proposta/${encodeURIComponent(codigo)}`);
+    // Timeout de 60s para a busca com Selenium
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 60000);
+
+    const res = await fetch(`${API_BASE}/proposta/${encodeURIComponent(codigo)}`, {signal: ctrl.signal});
+    clearTimeout(timer);
+
     const data = await res.json();
 
-    if(!res.ok || data.erro){
-      throw new Error(data.erro || 'Não foi possível concluir a busca.');
-    }
-
-    if(data.municipio){
-      document.getElementById('inMunicipio').value = data.estado
-        ? `${data.municipio} - ${data.estado}`
-        : data.municipio;
-    }
-
-    if(data.valor_proposta){
+    // Preenche os campos com o que veio
+    if(data.municipio)
+      document.getElementById('inMunicipio').value = data.estado ? `${data.municipio} - ${data.estado}` : data.municipio;
+    if(data.valor_proposta)
       document.getElementById('inValor').value = data.valor_proposta;
-    }
-
-    if(data.parlamentar){
-      document.getElementById('inAutor').value = data.parlamentar;
-    }
-
-    if(data.tipo_proposta){
+    if(data.parlamentar)
+      document.getElementById('inAutor').value = data.parlamentar + (data.partido ? ` (${data.partido})` : '');
+    if(data.tipo_proposta)
       document.getElementById('inNome').value = data.tipo_proposta;
-    }
 
-    const tipoApi = (data.tipo_proposta || '').toUpperCase();
-    let tipoSistema = '';
-
-    if(tipoApi.includes('PAP')) tipoSistema = 'PAP';
-    else if(tipoApi.includes('MAC')) tipoSistema = 'MAC';
-    else if(tipoApi.includes('APS')) tipoSistema = 'ESTRUTURACAO_APS';
-    else if(tipoApi.includes('ATENÇÃO ESPECIALIZADA') || tipoApi.includes('ATENCAO ESPECIALIZADA')) tipoSistema = 'ESTRUTURACAO_AE';
-    else if(tipoApi.includes('TRANSPORTE')) tipoSistema = 'TRANSPORTE_ELETIVO';
-    else if(tipoApi.includes('ARBOVIROSE')) tipoSistema = 'ARBOVIROSES';
-    else if(tipoApi.includes('ZOONOSES')) tipoSistema = 'VIG_ZOONOSES';
-    else if(tipoApi.includes('IMUNIZA')) tipoSistema = 'IMUNIZACAO';
-
-    if(tipoSistema){
-      document.getElementById('inTipo').value = tipoSistema;
+    // Detecta tipo do sistema
+    const ta = (data.tipo_proposta || '').toUpperCase();
+    let ts = '';
+    if(ta.includes('PAP') || ta.includes('ATENÇÃO PRIMÁRIA') || ta.includes('ATENCAO PRIMARIA')) ts='PAP';
+    else if(ta.includes('MAC') || ta.includes('HOSPITALAR') || ta.includes('AMBULATORIAL')) ts='MAC';
+    else if(ta.includes('ESTRUTURA') && (ta.includes('APS') || ta.includes('PRIMÁRIA'))) ts='INV_APS';
+    else if(ta.includes('ESTRUTURA') && (ta.includes('ESPECIALIZA') || ta.includes('UPA') || ta.includes('SAMU'))) ts='INV_AE';
+    else if(ta.includes('TRANSPORTE')) ts='TRANSPORTE';
+    else if(ta.includes('ARBOVIROSE') || ta.includes('DENGUE')) ts='ARBOVIROSES';
+    else if(ta.includes('ZOONOSE')) ts='ZOONOSES';
+    else if(ta.includes('IMUNIZA') || ta.includes('VACINA')) ts='IMUNIZACAO';
+    else if(ta.includes('HIV') || ta.includes('TUBERCU') || ta.includes('HEPATITE')) ts='HIV_TB';
+    else if(ta.includes('MALÁRIA') || ta.includes('MALARIA')) ts='MALARIA';
+    else if(ta.includes('DIGITAL') || ta.includes('TELESSAÚDE') || ta.includes('TELESSAUDE')) ts='SAUDE_DIGITAL';
+    if(ts){
+      document.getElementById('inTipo').value = ts;
       document.querySelectorAll('.tipo-card').forEach(c=>c.classList.remove('selected'));
-      const card = document.getElementById('tc_' + tipoSistema);
-      if(card) card.classList.add('selected');
+      const card = document.getElementById('tc_'+ts);
+      if(card){ card.classList.add('selected'); card.scrollIntoView({behavior:'smooth',block:'nearest'}); }
     }
 
-    const detalhes = [];
-    if(data.entidade) detalhes.push(`Entidade: <strong>${data.entidade}</strong>`);
-    if(data.numero_emenda) detalhes.push(`Emenda: <strong>${data.numero_emenda}</strong>`);
-    if(data.partido) detalhes.push(`Partido: <strong>${data.partido}</strong>`);
-    if(data.situacao_atual) detalhes.push(`Situação: <strong>${data.situacao_atual}</strong>`);
+    // Monta mensagem de sucesso
+    const det=[];
+    if(data.entidade) det.push(`Entidade: <strong>${data.entidade}</strong>`);
+    if(data.numero_emenda) det.push(`Emenda: <strong>${data.numero_emenda}</strong>`);
+    if(data.situacao_atual) det.push(`Situação: <strong>${data.situacao_atual}</strong>`);
+    if(data.ano) det.push(`Ano: <strong>${data.ano}</strong>`);
 
-    st.className='fetch-status ok';
-    st.innerHTML = `✅ <strong>Busca concluída.</strong> Fonte: <strong>API Render</strong>.${detalhes.length ? '<br>' + detalhes.join(' • ') : ''}`;
-
-    analisar();
+    const temDados = data.municipio || data.valor_proposta || data.tipo_proposta;
+    if(temDados){
+      st.className='fetch-status ok';
+      st.innerHTML=`✅ <strong>Dados encontrados!</strong>${det.length?'<br>'+det.join(' · '):''}`;
+      // Gera relatório automaticamente se encontrou dados
+      if(ts) setTimeout(()=>analisar(), 400);
+    } else if(data.erro){
+      st.className='fetch-status warn';
+      st.innerHTML=`⚠️ <strong>Proposta não retornou dados.</strong> Erro interno: ${data.erro}<br>Preencha os campos manualmente.`;
+    } else {
+      st.className='fetch-status warn';
+      st.innerHTML='⚠️ <strong>Proposta não encontrada</strong> ou a página não carregou dados. Preencha os campos manualmente.';
+    }
 
   }catch(e){
-    st.className='fetch-status err';
-    st.innerHTML='❌ <strong>Falha ao consultar a API.</strong> ' + e.message + '<br>Confira se o backend está online em <strong>' + apiBase + '</strong>.';
+    if(e.name==='AbortError'){
+      st.className='fetch-status err';
+      st.innerHTML='⏱️ <strong>Tempo esgotado (60s).</strong> O servidor demorou muito. Tente novamente ou preencha manualmente.';
+    } else {
+      st.className='fetch-status err';
+      st.innerHTML='❌ <strong>Erro na busca:</strong> ' + e.message + '<br>Verifique se o backend está online em <strong>' + API_BASE + '</strong>.';
+    }
   }
 
   document.getElementById('btnBuscar').disabled = false;
