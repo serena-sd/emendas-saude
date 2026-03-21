@@ -106,6 +106,39 @@ def home(): return {"status":"online","versao":"6.0"}
 @app.get("/health")
 def health(): return {"status":"ok"}
 
+@app.get("/debug/{numero}")
+def debug(numero: str):
+    """Retorna o texto bruto da página para diagnóstico"""
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    driver = None
+    try:
+        driver = criar_driver()
+        urls_fns = [
+            f"https://consultafns.saude.gov.br/#/proposta/{numero}",
+            f"https://investsuspaineis.saude.gov.br/extensions/CGIN_InvestsusPaineis/CGIN_InvestsusPaineis.html#/proposta/{numero}",
+            f"https://infoms.saude.gov.br/extensions/TransferenciaFundoaFundo/TransferenciaFundoaFundo.html#/proposta/{numero}",
+        ]
+        driver.get(urls_fns[0])
+        WebDriverWait(driver,30).until(EC.presence_of_element_located((By.TAG_NAME,"body")))
+        time.sleep(15)
+        body = driver.find_element(By.TAG_NAME,"body").text
+        url_atual = driver.current_url
+        titulo = driver.title
+        return {
+            "url_acessada": url_atual,
+            "titulo_pagina": titulo,
+            "tamanho_body": len(body),
+            "body_completo": body,  # texto completo visível
+        }
+    except Exception as e:
+        return {"erro": str(e)}
+    finally:
+        if driver:
+            try: driver.quit()
+            except: pass
+
 @app.get("/proposta/{numero}")
 def consultar(numero: str):
     from selenium.webdriver.common.by import By
