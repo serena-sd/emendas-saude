@@ -697,7 +697,7 @@ function onEmendaInput(){
 // ─── CONFIGURAÇÃO DO PROXY ─────────────────────────────────────────
 // Substitua pela URL do seu Cloudflare Worker após criá-lo
 // Ex: https://emendas-proxy.SEU-USUARIO.workers.dev
-const WORKER_URL = 'https://emendas-proxy.SEU-USUARIO.workers.dev';
+const WORKER_URL = 'https://emendas-proxy.samuel-duarte.workers.dev/';
 
 // ─── BUSCA VIA CLOUDFLARE WORKER ───────────────────────────────────
 async function buscarEmenda(){
@@ -715,7 +715,7 @@ async function buscarEmenda(){
   if(WORKER_URL.includes('SEU-USUARIO')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
-      +'Substitua <code>SEU-USUARIO</code> na variável <code>WORKER_URL</code> deste arquivo '
+      +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
       +'pela URL do seu Cloudflare Worker.';
     return;
   }
@@ -1815,7 +1815,7 @@ function onEmendaInput(){
 // ─── CONFIGURAÇÃO DO PROXY ─────────────────────────────────────────
 // Substitua pela URL do seu Cloudflare Worker após criá-lo
 // Ex: https://emendas-proxy.SEU-USUARIO.workers.dev
-const WORKER_URL = 'https://emendas-proxy.SEU-USUARIO.workers.dev';
+const WORKER_URL = 'https://emendas-proxy.samuel-duarte.workers.dev/';
 
 // ─── BUSCA VIA CLOUDFLARE WORKER ───────────────────────────────────
 async function buscarEmenda(){
@@ -1833,7 +1833,7 @@ async function buscarEmenda(){
   if(WORKER_URL.includes('SEU-USUARIO')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
-      +'Substitua <code>SEU-USUARIO</code> na variável <code>WORKER_URL</code> deste arquivo '
+      +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
       +'pela URL do seu Cloudflare Worker.';
     return;
   }
