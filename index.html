@@ -234,9 +234,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
           </div>
         </div>
       </div>
-      <div class="field">
-        <label>Chave da API (opcional nesta versão)</label>
-        <input type="text" id="inApiKey" placeholder="Ex: http://127.0.0.1:8000" value="http://127.0.0.1:8000"/>
+      <div class="field" style="display:none">
+        <label>API</label>
+        <input type="text" id="inApiKey" value="https://emendas-saude.onrender.com"/>
       </div>
       <div class="field">
         <label>Número da emenda ou da proposta</label>
@@ -586,9 +586,10 @@ const EXEMPLOS_TIPO={
 let ckTotal=0,ckDone=0,searchMode='auto';
 
 // ─── INICIALIZAÇÃO ──────────────────────────────────────────────────
+const API_BASE = 'https://emendas-saude.onrender.com';
+
 window.onload = function(){
-  const k = localStorage.getItem('pdt_key')||'';
-  if(k) document.getElementById('inApiKey').value=k;
+  document.getElementById('inApiKey').value = API_BASE;
   const cont = document.getElementById('tipoCards');
   TIPOS.forEach(t=>{
     const d=document.createElement('div');
@@ -612,8 +613,7 @@ window.onload = function(){
 };
 
 function salvarChave(){
-  const k=document.getElementById('inApiKey').value.trim();
-  if(k.length>10) localStorage.setItem('pdt_key',k);
+  // não é mais necessário salvar chave; a API é fixa no Render
 }
 
 function setSearchMode(mode){
@@ -699,45 +699,87 @@ function onEmendaInput(){
 
 // ─── BUSCA NO PORTAL DA TRANSPARÊNCIA ──────────────────────────────
 async function buscarEmenda(){
-  const apiBase=(document.getElementById('inApiKey').value.trim()||'http://127.0.0.1:8000').replace(/\/$/, '');
-  const codigo=document.getElementById('inEmenda').value.trim();
-  const st=document.getElementById('fetchStatus');
+  const apiBase = API_BASE;
+  const codigo = document.getElementById('inEmenda').value.trim();
+  const st = document.getElementById('fetchStatus');
+
   if(searchMode==='manual'){
     st.className='fetch-status warn';
     st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Complete os campos abaixo e gere o relatório.';
     return;
   }
-  if(!codigo){alert('Informe o número da emenda ou da proposta.');return;}
+
+  if(!codigo){
+    alert('Informe o número da proposta.');
+    return;
+  }
 
   st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Consultando API local...';
-  document.getElementById('btnBuscar').disabled=true;
+  st.innerHTML='<div class="mini-spin"></div> Consultando proposta na API...';
+  document.getElementById('btnBuscar').disabled = true;
 
   try{
-    const res=await fetch(`${apiBase}/api/buscar?numero=${encodeURIComponent(codigo)}`);
-    if(!res.ok){
-      let msg='Não foi possível concluir a busca.';
-      try{ const err=await res.json(); msg=err.detail||msg; }catch(_e){}
-      throw new Error(msg);
+    const res = await fetch(`${apiBase}/proposta/${encodeURIComponent(codigo)}`);
+    const data = await res.json();
+
+    if(!res.ok || data.erro){
+      throw new Error(data.erro || 'Não foi possível concluir a busca.');
     }
-    const data=await res.json();
 
-    if(data.municipio) document.getElementById('inMunicipio').value=data.municipio+(data.uf?(' - '+data.uf):'');
-    if(data.valor_formatado) document.getElementById('inValor').value=data.valor_formatado;
-    else if(data.valor) document.getElementById('inValor').value='R$ '+Number(data.valor).toLocaleString('pt-BR',{minimumFractionDigits:2});
-    if(data.autor) document.getElementById('inAutor').value=data.autor;
-    if(data.objeto) document.getElementById('inNome').value=data.objeto;
-    if(data.tipo) document.getElementById('inTipo').value=data.tipo;
+    if(data.municipio){
+      document.getElementById('inMunicipio').value = data.estado
+        ? `${data.municipio} - ${data.estado}`
+        : data.municipio;
+    }
 
-    const obs=(data.observacoes||[]).slice(0,3).join(' | ');
-    const badge=data.status==='ok'?'✅':(data.status==='parcial'?'⚠️':'ℹ️');
-    st.className='fetch-status '+(data.status==='ok'?'ok':(data.status==='parcial'?'warn':'warn'));
-    st.innerHTML=`${badge} <strong>Busca concluída.</strong> Fonte: <strong>${data.fonte||'local'}</strong>. ${data.tipo_label?('Tipo sugerido: <strong>'+data.tipo_label+'</strong>. '):''}${data.confianca!==undefined?('Confiança: <strong>'+data.confianca+'%</strong>. '):''}${obs?('<br>'+obs):''}`;
+    if(data.valor_proposta){
+      document.getElementById('inValor').value = data.valor_proposta;
+    }
+
+    if(data.parlamentar){
+      document.getElementById('inAutor').value = data.parlamentar;
+    }
+
+    if(data.tipo_proposta){
+      document.getElementById('inNome').value = data.tipo_proposta;
+    }
+
+    const tipoApi = (data.tipo_proposta || '').toUpperCase();
+    let tipoSistema = '';
+
+    if(tipoApi.includes('PAP')) tipoSistema = 'PAP';
+    else if(tipoApi.includes('MAC')) tipoSistema = 'MAC';
+    else if(tipoApi.includes('APS')) tipoSistema = 'ESTRUTURACAO_APS';
+    else if(tipoApi.includes('ATENÇÃO ESPECIALIZADA') || tipoApi.includes('ATENCAO ESPECIALIZADA')) tipoSistema = 'ESTRUTURACAO_AE';
+    else if(tipoApi.includes('TRANSPORTE')) tipoSistema = 'TRANSPORTE_ELETIVO';
+    else if(tipoApi.includes('ARBOVIROSE')) tipoSistema = 'ARBOVIROSES';
+    else if(tipoApi.includes('ZOONOSES')) tipoSistema = 'VIG_ZOONOSES';
+    else if(tipoApi.includes('IMUNIZA')) tipoSistema = 'IMUNIZACAO';
+
+    if(tipoSistema){
+      document.getElementById('inTipo').value = tipoSistema;
+      document.querySelectorAll('.tipo-card').forEach(c=>c.classList.remove('selected'));
+      const card = document.getElementById('tc_' + tipoSistema);
+      if(card) card.classList.add('selected');
+    }
+
+    const detalhes = [];
+    if(data.entidade) detalhes.push(`Entidade: <strong>${data.entidade}</strong>`);
+    if(data.numero_emenda) detalhes.push(`Emenda: <strong>${data.numero_emenda}</strong>`);
+    if(data.partido) detalhes.push(`Partido: <strong>${data.partido}</strong>`);
+    if(data.situacao_atual) detalhes.push(`Situação: <strong>${data.situacao_atual}</strong>`);
+
+    st.className='fetch-status ok';
+    st.innerHTML = `✅ <strong>Busca concluída.</strong> Fonte: <strong>API Render</strong>.${detalhes.length ? '<br>' + detalhes.join(' • ') : ''}`;
+
+    analisar();
+
   }catch(e){
     st.className='fetch-status err';
-    st.innerHTML='❌ <strong>Falha ao consultar a API local.</strong> '+e.message+'<br>Confira se o backend está rodando em <strong>'+apiBase+'</strong>.';
+    st.innerHTML='❌ <strong>Falha ao consultar a API.</strong> ' + e.message + '<br>Confira se o backend está online em <strong>' + apiBase + '</strong>.';
   }
-  document.getElementById('btnBuscar').disabled=false;
+
+  document.getElementById('btnBuscar').disabled = false;
 }
 
 // ─── GERAR RELATÓRIO ──────────────────────────────────────────────
