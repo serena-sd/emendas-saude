@@ -16,7 +16,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .topbar-pill{margin-left:auto;background:var(--blue-light);color:var(--blue);font-size:8pt;font-weight:700;padding:4px 12px;border-radius:20px}
 .app{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 62px)}
 .sidebar{background:var(--white);border-right:1px solid var(--border);padding:18px;overflow-y:auto}
-.content{padding:24px;overflowa-y:auto}
+.content{padding:24px;overflow-y:auto}
 /* TABS */
 .tabs{display:flex;gap:4px;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:14px}
 .tab-btn{flex:1;background:transparent;border:none;border-radius:7px;padding:9px 8px;font-size:8.5pt;font-weight:700;cursor:pointer;color:var(--muted);transition:all .15s;font-family:inherit}
@@ -585,7 +585,7 @@ const API_BASE = ''; // não utilizado — busca direto no FNS
 
 window.onload = function(){
   // URL do Worker já configurada — não precisa preencher manualmente
-  const WORKER_URL_PADRAO = 'https://emendas-proxy.samuel-duarte.workers.dev';
+  const WORKER_URL_PADRAO = 'https://emendas-saude.onrender.com';
   localStorage.setItem('worker_url', WORKER_URL_PADRAO);
   const el = document.getElementById('inWorkerUrl');
   if(el) el.value = WORKER_URL_PADRAO;
@@ -699,7 +699,7 @@ function onEmendaInput(){
 // ─── CONFIGURAÇÃO DO PROXY ─────────────────────────────────────────
 // Substitua pela URL do seu Cloudflare Worker após criá-lo
 // Ex: https://emendas-proxy.samuel-duarte.workers.dev
-const WORKER_URL = 'https://emendas-proxy.samuel-duarte.workers.dev';
+const WORKER_URL = 'https://emendas-saude.onrender.com';
 
 // ─── BUSCA VIA CLOUDFLARE WORKER ───────────────────────────────────
 function salvarWorkerUrl(){
@@ -722,13 +722,46 @@ async function buscarEmenda(){
 
   document.getElementById('btnBuscar').disabled = true;
   st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Buscando emenda <strong>' + codigo + '</strong> no Portal da Transparência...';
+  st.innerHTML=`<div style="width:100%">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div class="mini-spin"></div>
+      <span>Abrindo proposta <strong>${codigo}</strong> no FNS...</span>
+    </div>
+    <div style="background:#e2e8f0;border-radius:20px;height:6px;overflow:hidden">
+      <div id="progBar" style="height:100%;width:0%;background:#2563eb;border-radius:20px;transition:width 0.8s ease"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:7.5pt;color:#64748b">
+      <span id="progTxt">Iniciando navegador...</span>
+      <span id="progPct">0%</span>
+    </div>
+  </div>\`;
+
+  // Animação de progresso realista (~15s total)
+  const _etapas=[
+    {p:8,  t:"Iniciando navegador...",          d:600},
+    {p:22, t:"Abrindo página do FNS...",         d:2500},
+    {p:42, t:"Aguardando Angular carregar...",   d:5000},
+    {p:62, t:"Lendo dados da proposta...",       d:8500},
+    {p:80, t:"Extraindo informações...",         d:12000},
+    {p:92, t:"Montando resultado...",            d:14000},
+  ];
+  _etapas.forEach(e=>setTimeout(()=>{
+    const b=document.getElementById('progBar'),
+          t=document.getElementById('progTxt'),
+          p=document.getElementById('progPct');
+    if(b)b.style.width=e.p+'%';
+    if(t)t.textContent=e.t;
+    if(p)p.textContent=e.p+'%';
+  }, e.d));
+
+  // Acorda o Render antes da busca (plano grátis pode dormir)
+  try{ await fetch(\`\${WORKER_URL}/health\`,{signal:AbortSignal.timeout(8000)}); }catch(_){}
 
   try{
     const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 20000);
+    const timer = setTimeout(()=>ctrl.abort(), 45000);
 
-    const res = await fetch(`${WORKER_URL}?numero=${encodeURIComponent(codigo)}`, {
+    const res = await fetch(\`\${WORKER_URL}?numero=${encodeURIComponent(codigo)}`, {
       signal: ctrl.signal,
       headers: { 'Accept': 'application/json' }
     });
