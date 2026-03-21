@@ -584,9 +584,11 @@ let ckTotal=0,ckDone=0,searchMode='auto';
 const API_BASE = ''; // não utilizado — busca direto no FNS
 
 window.onload = function(){
-  // Recupera URL do Worker salva
-  const savedWorker = localStorage.getItem('worker_url');
-  if(savedWorker){ const el=document.getElementById('inWorkerUrl'); if(el) el.value=savedWorker; }
+  // URL do Worker já configurada — não precisa preencher manualmente
+  const WORKER_URL_PADRAO = 'https://emendas-proxy.samuel-duarte.workers.dev';
+  localStorage.setItem('worker_url', WORKER_URL_PADRAO);
+  const el = document.getElementById('inWorkerUrl');
+  if(el) el.value = WORKER_URL_PADRAO;
   const cont = document.getElementById('tipoCards');
   TIPOS.forEach(t=>{
     const d=document.createElement('div');
@@ -697,7 +699,7 @@ function onEmendaInput(){
 // ─── CONFIGURAÇÃO DO PROXY ─────────────────────────────────────────
 // Substitua pela URL do seu Cloudflare Worker após criá-lo
 // Ex: https://emendas-proxy.SEU-USUARIO.workers.dev
-const WORKER_URL = 'https://emendas-proxy.samuel-duarte.workers.dev/';
+const WORKER_URL = 'https://emendas-proxy.SEU-USUARIO.workers.dev';
 
 // ─── BUSCA VIA CLOUDFLARE WORKER ───────────────────────────────────
 async function buscarEmenda(){
@@ -712,10 +714,10 @@ async function buscarEmenda(){
   if(!codigo){ alert('Informe o número da emenda ou proposta.'); return; }
 
   // Avisa se o Worker ainda não foi configurado
-  if(WORKER_URL.includes('https://emendas-proxy.samuel-duarte.workers.dev/')){
+  if(WORKER_URL.includes('SEU-USUARIO')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
-      +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
+      +'Substitua <code>SEU-USUARIO</code> na variável <code>WORKER_URL</code> deste arquivo '
       +'pela URL do seu Cloudflare Worker.';
     return;
   }
@@ -1030,7 +1032,8 @@ async function buscarEmenda(){
 
   // Pega URL do Worker salva (localStorage ou campo)
   const workerUrl = (document.getElementById('inWorkerUrl').value.trim()
-    || localStorage.getItem('worker_url') || '').replace(/\/$/, '');
+    || localStorage.getItem('worker_url')
+    || 'https://emendas-proxy.samuel-duarte.workers.dev').replace(/\/$/, '');
 
   document.getElementById('btnBuscar').disabled = true;
   st.className='fetch-status loading';
@@ -1702,9 +1705,11 @@ let ckTotal=0,ckDone=0,searchMode='auto';
 const API_BASE = ''; // não utilizado — busca direto no FNS
 
 window.onload = function(){
-  // Recupera URL do Worker salva
-  const savedWorker = localStorage.getItem('worker_url');
-  if(savedWorker){ const el=document.getElementById('inWorkerUrl'); if(el) el.value=savedWorker; }
+  // URL do Worker já configurada — não precisa preencher manualmente
+  const WORKER_URL_PADRAO = 'https://emendas-proxy.samuel-duarte.workers.dev';
+  localStorage.setItem('worker_url', WORKER_URL_PADRAO);
+  const el = document.getElementById('inWorkerUrl');
+  if(el) el.value = WORKER_URL_PADRAO;
   const cont = document.getElementById('tipoCards');
   TIPOS.forEach(t=>{
     const d=document.createElement('div');
@@ -1815,7 +1820,7 @@ function onEmendaInput(){
 // ─── CONFIGURAÇÃO DO PROXY ─────────────────────────────────────────
 // Substitua pela URL do seu Cloudflare Worker após criá-lo
 // Ex: https://emendas-proxy.SEU-USUARIO.workers.dev
-const WORKER_URL = 'https://emendas-proxy.samuel-duarte.workers.dev/';
+const WORKER_URL = 'https://emendas-proxy.SEU-USUARIO.workers.dev';
 
 // ─── BUSCA VIA CLOUDFLARE WORKER ───────────────────────────────────
 async function buscarEmenda(){
@@ -1830,10 +1835,10 @@ async function buscarEmenda(){
   if(!codigo){ alert('Informe o número da emenda ou proposta.'); return; }
 
   // Avisa se o Worker ainda não foi configurado
-  if(WORKER_URL.includes('https://emendas-proxy.samuel-duarte.workers.dev/')){
+  if(WORKER_URL.includes('SEU-USUARIO')){
     st.className='fetch-status warn';
     st.innerHTML='⚙️ <strong>Configure o Worker primeiro.</strong> '
-      +'Substitua <code>https://emendas-proxy.samuel-duarte.workers.dev/</code> na variável <code>WORKER_URL</code> deste arquivo '
+      +'Substitua <code>SEU-USUARIO</code> na variável <code>WORKER_URL</code> deste arquivo '
       +'pela URL do seu Cloudflare Worker.';
     return;
   }
