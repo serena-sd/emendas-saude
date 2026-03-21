@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="API Emendas FNS", version="6.0")
+app = FastAPI(title="API Emendas FNS", version="7.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 
@@ -25,52 +25,6 @@ threading.Thread(target=_keep_alive, daemon=True).start()
 def limpar(t):
     return " ".join((t or "").replace("\xa0"," ").split()).strip()
 
-def regex(p, texto, g=1):
-    m = re.search(p, texto, re.IGNORECASE|re.DOTALL)
-    return limpar(m.group(g)) if m else ""
-
-def parsear(body, html, numero):
-    r = {k:"" for k in ["numero_proposta","municipio","estado","entidade","cnpj",
-         "tipo_proposta","ano","valor_proposta","valor_total_empenho",
-         "valor_a_pagar","situacao_atual","data_ultima_atualizacao",
-         "partido","parlamentar","numero_emenda","valor_emenda"]}
-    r["numero_proposta"] = numero
-    for campo, chave in [("municipio","municipio"),("estado","estado"),
-        ("entidade","entidade"),("cnpj","cnpj"),("tipo_proposta","tipoProposta"),
-        ("ano","ano"),("valor_proposta","valorProposta"),
-        ("situacao_atual","situacaoAtual"),("data_ultima_atualizacao","dataUltimaAtualizacao")]:
-        v = regex(rf'"{chave}"\s*:\s*"([^"]+)"', html)
-        if v: r[campo] = v
-    if not r["municipio"]:
-        r["municipio"] = regex(r"Munic[íi]pio\s*:?\s*([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀ-Ú\s]+?)(?:\n|Estado|CNPJ|$)", body)
-    if not r["estado"]:
-        r["estado"] = regex(r"Estado\s*:?\s*([A-Z]{2})\b", body)
-    if not r["entidade"]:
-        r["entidade"] = regex(r"Entidade\s*:?\s*(.+?)(?:\n|CNPJ|$)", body)
-    if not r["cnpj"]:
-        m = re.search(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", body+html)
-        r["cnpj"] = m.group(0) if m else ""
-    if not r["tipo_proposta"]:
-        r["tipo_proposta"] = regex(r"Tipo da Proposta\s*:?\s*(.+?)(?:\n|Ano|Valor|$)", body)
-    if not r["ano"]:
-        r["ano"] = regex(r"\bAno\s*:?\s*(20\d{2})\b", body)
-    if not r["valor_proposta"]:
-        r["valor_proposta"] = regex(r"Valor da Proposta\s*:?\s*(R\$\s*[\d\.,]+)", body)
-    if not r["valor_total_empenho"]:
-        r["valor_total_empenho"] = regex(r"Valor Total Empenho\s*:?\s*(R\$\s*[\d\.,]+)", body)
-    if not r["valor_a_pagar"]:
-        r["valor_a_pagar"] = regex(r"Valor a Pagar\s*:?\s*(R\$\s*[\d\.,]+)", body)
-    if not r["situacao_atual"]:
-        r["situacao_atual"] = regex(r"Situa[çc][aã]o Atual\s*:?\s*(.+?)(?:\n|Data|$)", body)
-    if not r["data_ultima_atualizacao"]:
-        r["data_ultima_atualizacao"] = regex(r"[Úú]ltima Atualiza[çc][aã]o\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})", body)
-    m_em = re.search(r"\b([A-Z]{2,5})\s+([A-ZÀÁÂÃÉÊÍÓÔÕÚÇ][A-ZÀ-Ú\s]+?)\s+(\d{6,10})\s+(20\d{2})\s+(R\$\s*[\d\.,]+)", body)
-    if m_em:
-        r["partido"]=limpar(m_em.group(1)); r["parlamentar"]=limpar(m_em.group(2))
-        r["numero_emenda"]=limpar(m_em.group(3)); r["ano"]=r["ano"] or limpar(m_em.group(4))
-        r["valor_emenda"]=limpar(m_em.group(5))
-    return r
-
 def criar_driver():
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
@@ -83,7 +37,6 @@ def criar_driver():
               "--mute-audio","--disable-background-networking"]:
         opts.add_argument(a)
 
-    # Render tem Chrome em /usr/bin/google-chrome
     for chrome in ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable",
                    "/usr/bin/chromium","/usr/bin/chromium-browser"]:
         if os.path.isfile(chrome):
@@ -91,47 +44,163 @@ def criar_driver():
             logger.info(f"Chrome: {chrome}")
             break
 
-    # Tenta chromedriver fixo, senão usa webdriver-manager
     for drv in ["/usr/bin/chromedriver","/usr/local/bin/chromedriver"]:
         if os.path.isfile(drv):
-            logger.info(f"Driver: {drv}")
             return webdriver.Chrome(service=Service(drv), options=opts)
 
-    logger.info("Usando webdriver-manager")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+    return webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()), options=opts)
 
+# ── Endpoints ────────────────────────────────────────────────────
 @app.get("/")
-def home(): return {"status":"online","versao":"6.0"}
+def home(): return {"status":"online","versao":"7.0"}
 
 @app.get("/health")
 def health(): return {"status":"ok"}
 
-@app.get("/debug/{numero}")
-def debug(numero: str):
-    """Retorna o texto bruto da página para diagnóstico"""
+@app.get("/debug/pagina")
+def debug_pagina():
+    """Vê a estrutura da página de emendas para entender os campos"""
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     driver = None
     try:
         driver = criar_driver()
-        urls_fns = [
-            f"https://investsuspaineis.saude.gov.br/extensions/CGIN_InvestsusPaineis/CGIN_InvestsusPaineis.html#/proposta/{numero}",
-            f"https://consultafns.saude.gov.br/#/consulta-proposta?numero={numero}",
-        ]
-        driver.get(urls_fns[0])
-        WebDriverWait(driver,30).until(EC.presence_of_element_located((By.TAG_NAME,"body")))
-        time.sleep(15)
-        body = driver.find_element(By.TAG_NAME,"body").text
+        url = "https://investsuspaineis.saude.gov.br/extensions/CGIN_Painel_Emendas/CGIN_Painel_Emendas.html"
+        logger.info(f"Abrindo: {url}")
+        driver.get(url)
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body")))
+        time.sleep(8)
+
+        body = driver.find_element(By.TAG_NAME, "body").text
         url_atual = driver.current_url
         titulo = driver.title
+
+        # Captura todos os selects/inputs da página
+        selects = []
+        for s in driver.find_elements(By.TAG_NAME, "select"):
+            try:
+                selects.append({
+                    "id": s.get_attribute("id"),
+                    "name": s.get_attribute("name"),
+                    "class": s.get_attribute("class"),
+                    "options_count": len(s.find_elements(By.TAG_NAME, "option")),
+                    "options_text": [o.text for o in s.find_elements(By.TAG_NAME, "option")][:5]
+                })
+            except: pass
+
+        inputs = []
+        for i in driver.find_elements(By.TAG_NAME, "input"):
+            try:
+                inputs.append({
+                    "id": i.get_attribute("id"),
+                    "name": i.get_attribute("name"),
+                    "placeholder": i.get_attribute("placeholder"),
+                    "type": i.get_attribute("type"),
+                })
+            except: pass
+
+        buttons = []
+        for b in driver.find_elements(By.TAG_NAME, "button"):
+            try:
+                buttons.append({"text": b.text, "id": b.get_attribute("id")})
+            except: pass
+
         return {
             "url_acessada": url_atual,
-            "titulo_pagina": titulo,
-            "tamanho_body": len(body),
-            "body_completo": body,  # texto completo visível
+            "titulo": titulo,
+            "body_preview": body[:2000],
+            "selects": selects,
+            "inputs": inputs,
+            "buttons": buttons,
         }
     except Exception as e:
+        logger.error(f"Erro debug: {e}")
+        return {"erro": str(e)}
+    finally:
+        if driver:
+            try: driver.quit()
+            except: pass
+
+@app.get("/emendas/municipio/{municipio}/ano/{ano}")
+def buscar_por_municipio(municipio: str, ano: str = "2026"):
+    """Busca todas as emendas de um município em um ano"""
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.select import Select
+
+    driver = None
+    try:
+        logger.info(f"Buscando emendas: {municipio} / {ano}")
+        driver = criar_driver()
+        url = "https://investsuspaineis.saude.gov.br/extensions/CGIN_Painel_Emendas/CGIN_Painel_Emendas.html"
+        driver.get(url)
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body")))
+        time.sleep(8)
+
+        # Tenta selecionar o ano
+        try:
+            sel_ano = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH,
+                    "//select[.//option[contains(text(),'2026')]]")))
+            Select(sel_ano).select_by_visible_text(ano)
+            time.sleep(2)
+            logger.info(f"Ano {ano} selecionado")
+        except Exception as e:
+            logger.warning(f"Não selecionou ano: {e}")
+
+        # Tenta preencher o município (input de texto ou select)
+        try:
+            # Tenta input de texto primeiro
+            inp_mun = driver.find_element(By.XPATH,
+                "//input[@placeholder[contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'munic')]]")
+            inp_mun.clear()
+            inp_mun.send_keys(municipio)
+            time.sleep(2)
+            logger.info(f"Município digitado: {municipio}")
+        except:
+            try:
+                # Tenta select de município
+                sel_mun = driver.find_element(By.XPATH,
+                    "//select[.//option[contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'munic') or contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cidreira') or contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'selecione')]]")
+                for opt in sel_mun.find_elements(By.TAG_NAME, "option"):
+                    if municipio.upper() in opt.text.upper():
+                        opt.click()
+                        break
+                time.sleep(2)
+                logger.info(f"Município selecionado no select")
+            except Exception as e:
+                logger.warning(f"Não selecionou município: {e}")
+
+        # Clica no botão de pesquisa/consulta
+        try:
+            btn = driver.find_element(By.XPATH,
+                "//button[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'consultar') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'pesquisar') or contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'buscar')]")
+            btn.click()
+            time.sleep(5)
+            logger.info("Botão clicado")
+        except Exception as e:
+            logger.warning(f"Botão não encontrado: {e}")
+
+        body = driver.find_element(By.TAG_NAME, "body").text
+        html = driver.page_source
+        logger.info(f"Body resultado: {len(body)} chars")
+        logger.info(f"Preview: {body[:500]}")
+
+        return {
+            "municipio": municipio,
+            "ano": ano,
+            "url": driver.current_url,
+            "body_preview": body[:3000],
+            "total_chars": len(body),
+        }
+
+    except Exception as e:
+        logger.error(f"Erro: {e}")
         return {"erro": str(e)}
     finally:
         if driver:
@@ -140,37 +209,13 @@ def debug(numero: str):
 
 @app.get("/proposta/{numero}")
 def consultar(numero: str):
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    driver = None
-    try:
-        logger.info(f"Buscando: {numero}")
-        driver = criar_driver()
-        # Tenta múltiplas URLs — o FNS mudou de endereço
-        urls_fns = [
-            f"https://investsuspaineis.saude.gov.br/extensions/CGIN_InvestsusPaineis/CGIN_InvestsusPaineis.html#/proposta/{numero}",
-            f"https://consultafns.saude.gov.br/#/consulta-proposta?numero={numero}",
-            f"https://consultafns.saude.gov.br/#/proposta-detalhe/{numero}",
-        ]
-        url = urls_fns[0]
-        driver.get(url)
-        WebDriverWait(driver,30).until(EC.presence_of_element_located((By.TAG_NAME,"body")))
-        time.sleep(15)
-        body = driver.find_element(By.TAG_NAME,"body").text
-        html = driver.page_source
-        logger.info(f"Body: {len(body)} chars")
-        logger.info(f"Body preview: {body[:500]}")
-        resultado = parsear(body, html, numero)
-        logger.info(f"OK: {resultado['municipio']} | {resultado['tipo_proposta']}")
-        return resultado
-    except Exception as e:
-        logger.error(f"Erro: {e}")
-        return {"numero_proposta":numero,"municipio":"","estado":"","entidade":"","cnpj":"",
-                "tipo_proposta":"","ano":"","valor_proposta":"","valor_total_empenho":"",
-                "valor_a_pagar":"","situacao_atual":"","data_ultima_atualizacao":"",
-                "partido":"","parlamentar":"","numero_emenda":"","valor_emenda":"","erro":str(e)}
-    finally:
-        if driver:
-            try: driver.quit()
-            except: pass
+    """Mantido para compatibilidade — redireciona para busca por município"""
+    return {
+        "numero_proposta": numero,
+        "municipio":"","estado":"","entidade":"","cnpj":"",
+        "tipo_proposta":"","ano":"","valor_proposta":"",
+        "valor_total_empenho":"","valor_a_pagar":"",
+        "situacao_atual":"","data_ultima_atualizacao":"",
+        "partido":"","parlamentar":"","numero_emenda":"","valor_emenda":"",
+        "info": "Use /debug/pagina primeiro para entender a estrutura, depois /emendas/municipio/CIDREIRA/ano/2026"
+    }
