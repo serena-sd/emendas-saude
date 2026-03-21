@@ -215,10 +215,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   <!-- TAB: BUSCA POR NÚMERO -->
   <div id="tabBusca">
     <div class="api-note">
-      <strong>🔌 Busca via API local</strong>.<br>
-      Esta versão foi preparada para consultar uma API própria rodando no seu computador ou servidor.<br>
-      Você informa apenas o número da emenda ou da proposta e a API tenta buscar sozinha os dados oficiais e aplicar o fallback local quando necessário.<br>
-      A chave pode ser obtida em <a href="https://portaldatransparencia.gov.br/api-de-dados" target="_blank">portaldatransparencia.gov.br/api-de-dados</a>.
+      <strong>🔍 Busca direta no FNS — sem backend!</strong><br>
+      Digite o número da proposta e o sistema consulta <strong>diretamente</strong> o Fundo Nacional de Saúde. Não precisa de servidor, Docker nem Render.
     </div>
     <div class="form-card">
       <div class="field">
@@ -234,10 +232,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
           </div>
         </div>
       </div>
-      <div class="field" style="display:none">
-        <label>API</label>
-        <input type="text" id="inApiKey" value="https://emendas-saude.onrender.com"/>
-      </div>
+      <input type="hidden" id="inApiKey" value=""/>
       <div class="field">
         <label>Número da emenda ou da proposta</label>
         <input type="text" id="inEmenda" placeholder="Ex: 36000765503202600" oninput="onEmendaInput()"/>
@@ -586,10 +581,10 @@ const EXEMPLOS_TIPO={
 let ckTotal=0,ckDone=0,searchMode='auto';
 
 // ─── INICIALIZAÇÃO ──────────────────────────────────────────────────
-const API_BASE = 'https://emendas-saude.onrender.com';
+const API_BASE = ''; // não utilizado — busca direto no FNS
 
 window.onload = function(){
-  document.getElementById('inApiKey').value = API_BASE;
+  // API FNS — não precisa de chave
   const cont = document.getElementById('tipoCards');
   TIPOS.forEach(t=>{
     const d=document.createElement('div');
@@ -697,86 +692,91 @@ function onEmendaInput(){
   if(tipo) document.getElementById('inTipo').value=tipo;
 }
 
-// ─── ACORDAR O RENDER (plano free dorme após inatividade) ──────────
-async function acordarBackend(){
-  const st = document.getElementById('fetchStatus');
-  st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Aguardando o servidor acordar (pode levar até 40s na 1ª vez)...';
-  try{
-    const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 45000);
-    const res = await fetch(`${API_BASE}/health`, {signal: ctrl.signal});
-    clearTimeout(timer);
-    return res.ok;
-  }catch(e){
-    return false;
-  }
-}
-
-// ─── BUSCA COM WAKE-UP + TIMEOUT LONGO ─────────────────────────────
+// ─── BUSCA DIRETA NA API DO FNS ────────────────────────────────────
+// Sem backend! Consulta diretamente o Fundo Nacional de Saúde.
+// A API do FNS (apifns.saude.gov.br) tem CORS aberto — funciona do browser.
+// ────────────────────────────────────────────────────────────────────
 async function buscarEmenda(){
   const codigo = document.getElementById('inEmenda').value.trim();
   const st = document.getElementById('fetchStatus');
 
   if(searchMode==='manual'){
     st.className='fetch-status warn';
-    st.innerHTML='✍️ <strong>Modo manual guiado ativo.</strong> Complete os campos abaixo e gere o relatório.';
+    st.innerHTML='✍️ <strong>Modo manual.</strong> Complete os campos abaixo e gere o relatório.';
     return;
   }
   if(!codigo){ alert('Informe o número da proposta.'); return; }
 
   document.getElementById('btnBuscar').disabled = true;
-
-  // PASSO 1: acorda o servidor se necessário
   st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> <span id="stMsg">Verificando se o servidor está online...</span>';
+  st.innerHTML='<div class="mini-spin"></div> Consultando FNS para proposta <strong>' + codigo + '</strong>...';
 
-  const online = await acordarBackend();
-  if(!online){
-    st.className='fetch-status err';
-    st.innerHTML='❌ <strong>Servidor offline.</strong> O backend em <strong>' + API_BASE + '</strong> não respondeu. Verifique se o serviço está ativo no Render e tente novamente.';
-    document.getElementById('btnBuscar').disabled = false;
-    return;
+  // Tenta 3 URLs da API do FNS em sequência
+  const urls = [
+    `https://apifns.saude.gov.br/api/proposta/detalhe?numero=${encodeURIComponent(codigo)}`,
+    `https://apifns.saude.gov.br/api/proposta?numero=${encodeURIComponent(codigo)}`,
+    `https://infoms.saude.gov.br/extensions/TransferenciaFundoaFundo/api/proposta/${encodeURIComponent(codigo)}`
+  ];
+
+  let data = null;
+  let erros = [];
+
+  for(const url of urls){
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 15000);
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      clearTimeout(timer);
+      if(res.ok){
+        const json = await res.json();
+        if(json && (json.municipio || json.descricao || json.tipoProposta || json.numero)){
+          data = json;
+          break;
+        }
+      }
+    }catch(e){
+      erros.push(e.message);
+    }
   }
 
-  // PASSO 2: busca a proposta (Selenium demora ~15s)
-  st.className='fetch-status loading';
-  st.innerHTML='<div class="mini-spin"></div> Servidor online! Buscando proposta nº <strong>' + codigo + '</strong> (aguarde ~20 segundos)...';
+  if(data){
+    // Normaliza os nomes de campo (a API pode usar camelCase ou snake_case)
+    const municipio  = data.municipio   || data.nomeMunicipio || '';
+    const estado     = data.estado      || data.uf            || '';
+    const valor      = data.valorProposta || data.valor_proposta || data.valor || '';
+    const tipo       = data.tipoProposta  || data.tipo_proposta || data.descricao || data.objeto || '';
+    const parlamentar= data.parlamentar   || data.nomeAutor   || '';
+    const partido    = data.partido       || data.siglaPartido || '';
+    const entidade   = data.entidade      || data.nomeEntidade || '';
+    const situacao   = data.situacaoAtual || data.situacao_atual || data.situacao || '';
+    const ano        = data.ano           || '';
 
-  try{
-    // Timeout de 60s para a busca com Selenium
-    const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 60000);
+    if(municipio) document.getElementById('inMunicipio').value = estado ? `${municipio} - ${estado}` : municipio;
+    if(valor){
+      const vNum = typeof valor === 'number' ? valor : parseFloat(String(valor).replace(/[^0-9,]/g,'').replace(',','.'));
+      document.getElementById('inValor').value = isNaN(vNum) ? String(valor) : 'R$ ' + vNum.toLocaleString('pt-BR',{minimumFractionDigits:2});
+    }
+    if(parlamentar) document.getElementById('inAutor').value = parlamentar + (partido ? ' ('+partido+')' : '');
+    if(tipo) document.getElementById('inNome').value = tipo;
 
-    const res = await fetch(`${API_BASE}/proposta/${encodeURIComponent(codigo)}`, {signal: ctrl.signal});
-    clearTimeout(timer);
-
-    const data = await res.json();
-
-    // Preenche os campos com o que veio
-    if(data.municipio)
-      document.getElementById('inMunicipio').value = data.estado ? `${data.municipio} - ${data.estado}` : data.municipio;
-    if(data.valor_proposta)
-      document.getElementById('inValor').value = data.valor_proposta;
-    if(data.parlamentar)
-      document.getElementById('inAutor').value = data.parlamentar + (data.partido ? ` (${data.partido})` : '');
-    if(data.tipo_proposta)
-      document.getElementById('inNome').value = data.tipo_proposta;
-
-    // Detecta tipo do sistema
-    const ta = (data.tipo_proposta || '').toUpperCase();
+    // Detecta o tipo para o relatório
+    const ta = (tipo).toUpperCase();
     let ts = '';
     if(ta.includes('PAP') || ta.includes('ATENÇÃO PRIMÁRIA') || ta.includes('ATENCAO PRIMARIA')) ts='PAP';
     else if(ta.includes('MAC') || ta.includes('HOSPITALAR') || ta.includes('AMBULATORIAL')) ts='MAC';
-    else if(ta.includes('ESTRUTURA') && (ta.includes('APS') || ta.includes('PRIMÁRIA'))) ts='INV_APS';
-    else if(ta.includes('ESTRUTURA') && (ta.includes('ESPECIALIZA') || ta.includes('UPA') || ta.includes('SAMU'))) ts='INV_AE';
+    else if(ta.includes('ESTRUTUR') && (ta.includes('APS') || ta.includes('PRIMÁRIA') || ta.includes('PRIMARIA'))) ts='INV_APS';
+    else if(ta.includes('ESTRUTUR') && (ta.includes('ESPECIALIZ') || ta.includes('UPA') || ta.includes('SAMU'))) ts='INV_AE';
     else if(ta.includes('TRANSPORTE')) ts='TRANSPORTE';
-    else if(ta.includes('ARBOVIROSE') || ta.includes('DENGUE')) ts='ARBOVIROSES';
+    else if(ta.includes('ARBOVIROSE') || ta.includes('DENGUE') || ta.includes('ZIKA')) ts='ARBOVIROSES';
     else if(ta.includes('ZOONOSE')) ts='ZOONOSES';
-    else if(ta.includes('IMUNIZA') || ta.includes('VACINA')) ts='IMUNIZACAO';
-    else if(ta.includes('HIV') || ta.includes('TUBERCU') || ta.includes('HEPATITE')) ts='HIV_TB';
+    else if(ta.includes('IMUNIZA') || ta.includes('VACINA') || ta.includes('REDE DE FRIO')) ts='IMUNIZACAO';
+    else if(ta.includes('HIV') || ta.includes('TUBERCU') || ta.includes('HEPATITE') || ta.includes('IST')) ts='HIV_TB';
     else if(ta.includes('MALÁRIA') || ta.includes('MALARIA')) ts='MALARIA';
     else if(ta.includes('DIGITAL') || ta.includes('TELESSAÚDE') || ta.includes('TELESSAUDE')) ts='SAUDE_DIGITAL';
+
     if(ts){
       document.getElementById('inTipo').value = ts;
       document.querySelectorAll('.tipo-card').forEach(c=>c.classList.remove('selected'));
@@ -784,34 +784,27 @@ async function buscarEmenda(){
       if(card){ card.classList.add('selected'); card.scrollIntoView({behavior:'smooth',block:'nearest'}); }
     }
 
-    // Monta mensagem de sucesso
-    const det=[];
-    if(data.entidade) det.push(`Entidade: <strong>${data.entidade}</strong>`);
-    if(data.numero_emenda) det.push(`Emenda: <strong>${data.numero_emenda}</strong>`);
-    if(data.situacao_atual) det.push(`Situação: <strong>${data.situacao_atual}</strong>`);
-    if(data.ano) det.push(`Ano: <strong>${data.ano}</strong>`);
+    const det = [];
+    if(entidade)  det.push('Entidade: <strong>'+entidade+'</strong>');
+    if(situacao)  det.push('Situação: <strong>'+situacao+'</strong>');
+    if(ano)       det.push('Ano: <strong>'+ano+'</strong>');
 
-    const temDados = data.municipio || data.valor_proposta || data.tipo_proposta;
-    if(temDados){
-      st.className='fetch-status ok';
-      st.innerHTML=`✅ <strong>Dados encontrados!</strong>${det.length?'<br>'+det.join(' · '):''}`;
-      // Gera relatório automaticamente se encontrou dados
-      if(ts) setTimeout(()=>analisar(), 400);
-    } else if(data.erro){
+    st.className='fetch-status ok';
+    st.innerHTML='✅ <strong>Dados encontrados no FNS!</strong>'+(det.length?'<br>'+det.join(' · '):'');
+    if(ts || municipio) setTimeout(()=>analisar(), 400);
+
+  } else {
+    // CORS bloqueado (arquivo local) ou proposta não encontrada
+    const isCors = erros.some(e => e.includes('fetch') || e.includes('network') || e.includes('Failed'));
+    if(isCors){
       st.className='fetch-status warn';
-      st.innerHTML=`⚠️ <strong>Proposta não retornou dados.</strong> Erro interno: ${data.erro}<br>Preencha os campos manualmente.`;
+      st.innerHTML='⚠️ <strong>Busca automática requer o GitHub Pages.</strong><br>'
+        +'Quando o sistema estiver em <strong>serena-sd.github.io/emendas-saude</strong> a busca funciona automaticamente.<br>'
+        +'Por enquanto, preencha os campos manualmente ou selecione o tipo na aba "Por Tipo".';
     } else {
       st.className='fetch-status warn';
-      st.innerHTML='⚠️ <strong>Proposta não encontrada</strong> ou a página não carregou dados. Preencha os campos manualmente.';
-    }
-
-  }catch(e){
-    if(e.name==='AbortError'){
-      st.className='fetch-status err';
-      st.innerHTML='⏱️ <strong>Tempo esgotado (60s).</strong> O servidor demorou muito. Tente novamente ou preencha manualmente.';
-    } else {
-      st.className='fetch-status err';
-      st.innerHTML='❌ <strong>Erro na busca:</strong> ' + e.message + '<br>Verifique se o backend está online em <strong>' + API_BASE + '</strong>.';
+      st.innerHTML='⚠️ <strong>Proposta não encontrada no FNS.</strong><br>'
+        +'Verifique o número e tente novamente, ou preencha os campos manualmente.';
     }
   }
 
